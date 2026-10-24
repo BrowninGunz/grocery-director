@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grocery Dir">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Grocery Director</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap">
+<style>
+/* Layout: one app column on a phone (bottom tabs); on a PC the Today screen splits into call | loot, tabs move to the top. */
+:root {
+  --void: #0d0f13; --slab: #161920; --slab-2: #1d212b; --line: #2a2f3c; --text: #e8e4d9; --dim: #8e95a2;
+  --gold: #ceae33; --gold-ink: #15130a; --violet: #2a1d3d; --bad: #c4493f; --ok: #5aa266;
+  --r-common: #c3bcb4; --r-uncommon: #4f9a5a; --r-rare: #5b86c2; --r-legendary: #8a5cc4; --r-exotic: #ceae33;
+  --display: "Archivo", "Arial Narrow", Arial, sans-serif; --body: "Archivo", Arial, Helvetica, sans-serif;
+  --tier: var(--r-common); color-scheme: dark;
+}
+* { box-sizing: border-box }
+html, body { background: var(--void); color: var(--text) }
+body { font: 15px/1.45 var(--body); font-variation-settings: "wdth" 100; padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 96px; -webkit-font-smoothing: antialiased }
+button, input, select { font: inherit; color: inherit }
+.num { font-variant-numeric: tabular-nums }
+.caps { text-transform: uppercase; letter-spacing: .16em; font-size: 11px; color: var(--dim); font-weight: 600 }
+.wrap { max-width: 1120px; margin: 0 auto }
+
+/* top bar + nav */
+header.top { display: flex; align-items: center; gap: 12px; padding-block: 14px 10px; position: sticky; top: env(safe-area-inset-top, 0px);
+  background: linear-gradient(var(--void) 75%, transparent); z-index: 5 }
+.brand { font-family: var(--display); font-variation-settings: "wdth" 125; font-weight: 800; letter-spacing: .22em; font-size: 13px; color: var(--gold) }
+.brand small { display: block; font-weight: 500; letter-spacing: .18em; font-size: 10px; color: var(--dim) }
+.top .spacer { flex: 1 }
+.iconbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--slab); color: var(--gold); font-weight: 800; cursor: pointer }
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: rgba(13,15,19,.96);
+  border-top: 1px solid var(--line); padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); z-index: 10 }
+nav.tabs button { background: none; border: 0; padding: 8px 2px; display: grid; justify-items: center; gap: 3px; cursor: pointer; color: var(--dim);
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600 }
+nav.tabs button svg { width: 20px; height: 20px }
+nav.tabs button[aria-selected="true"] { color: var(--gold) }
+@media (min-width: 760px) {
+  nav.tabs { position: static; display: flex; gap: 4px; background: none; border: 0; padding: 0 }
+  nav.tabs button { grid-auto-flow: column; padding: 8px 14px; border-radius: 999px }
+  nav.tabs button[aria-selected="true"] { background: rgba(206,174,51,.12) }
+  body { padding-block: 0 40px }
+}
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+
+/* demo / get-it strip */
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; border: 1px dashed rgba(206,174,51,.45); border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 14px; background: rgba(206,174,51,.06) }
+.demo p { margin: 0; flex: 1 1 260px; color: var(--text) }
+.demo b { color: var(--gold) }
+
+/* buttons, fields */
+.btn { border: 1px solid var(--line); background: var(--slab-2); border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 650 }
+.btn.gold { background: var(--gold); color: var(--gold-ink); border-color: var(--gold) }
+.btn.ghost { background: none }
+.btn.danger { border-color: rgba(196,73,63,.6); color: #f0b3ad; background: none }
+label.f { display: grid; gap: 5px; align-content: space-between; font-size: 12px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; font-weight: 600 }
+input[type=text], input[type=number], input[type=date], input[type=search], select { width: 100%; min-width: 0; background: var(--void); border: 1px solid var(--line);
+  border-radius: 8px; padding: 11px 12px; font-size: 16px; text-transform: none; letter-spacing: 0; font-weight: 500 }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px }
+.card { background: var(--slab); border: 1px solid var(--line); border-radius: 12px; padding: 16px }
+section.screen { display: grid; gap: 16px; max-width: 660px; margin: 0 auto }
+section.screen.wide { max-width: none }
+h2.sec { font-family: var(--display); font-variation-settings: "wdth" 118; font-size: 12px; letter-spacing: .24em; color: var(--gold);
+  text-transform: uppercase; margin: 0; display: flex; align-items: center; gap: 8px }
+h2.sec::before { content: ""; width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg) }
+
+/* TODAY */
+.today { display: grid; gap: 16px }
+@media (min-width: 960px) { .today { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start } .today .col { display: grid; gap: 16px } }
+.today .col { display: grid; gap: 16px; min-width: 0 }
+.hero { position: relative; overflow: hidden; border-radius: 14px; padding: 22px 20px 18px 26px; border: 1px solid #3a2f52;
+  background: radial-gradient(120% 140% at 100% 0%, #3b2a57 0%, var(--violet) 38%, var(--slab) 78%) }
+.hero::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--tier); box-shadow: 0 0 18px var(--tier) }
+.hero::after { content: ""; position: absolute; inset: 0; opacity: .5; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='48.5'%3E%3Cpath d='M14 0 28 8.1v16.2L14 32.4 0 24.3V8.1zM14 32.4v16.1' fill='none' stroke='%23ceae33' stroke-opacity='.07'/%3E%3C/svg%3E") }
+.planet { position: absolute; right: -26px; top: -30px; width: 130px; height: 130px; border-radius: 50%; opacity: .55;
+  background: radial-gradient(circle at 35% 35%, #efe9da, #9c967f 55%, #2b2735 72%); box-shadow: 0 0 60px rgba(206,174,51,.25) }
+.planet::after { content: ""; position: absolute; left: -38px; right: -38px; top: 52px; height: 26px; border-radius: 50%; border: 2px solid rgba(206,174,51,.55); transform: rotate(-14deg) }
+.hero .eyebrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative }
+.tierchip { font-size: 10px; letter-spacing: .2em; font-weight: 800; padding: 4px 9px; border-radius: 4px; background: var(--tier); color: #0d0f13 }
+.call { position: relative; font-family: var(--display); font-variation-settings: "wdth" 112; font-weight: 800; font-size: clamp(30px, 8.5vw, 50px);
+  line-height: 1.02; color: var(--gold); margin: 12px 0 6px; text-wrap: balance; letter-spacing: .01em }
+.save { position: relative; font-size: 19px; font-weight: 700; color: #fff }
+.quote { position: relative; margin-top: 10px; color: #cbbd8f; font-style: italic }
+.quote::after { content: "  \2014 Ghost"; font-style: normal; color: var(--dim); font-size: 12px; letter-spacing: .12em }
+@media (prefers-reduced-motion: no-preference) {
+  .hero.enter .call, .hero.enter .save, .hero.enter .quote { animation: rise .55s cubic-bezier(.2,.8,.2,1) both }
+  .hero.enter .save { animation-delay: .08s } .hero.enter .quote { animation-delay: .16s }
+  .hero.enter::before { animation: sweep .7s ease-out both }
+}
+@keyframes rise { from { transform: translateY(8px) } to { transform: none } }
+@keyframes sweep { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px }
+.tile { background: var(--slab); border: 1px solid var(--line); border-top: 2px solid var(--gold); border-radius: 10px; padding: 12px 10px; text-align: center; min-width: 0 }
+.tile .v { font-family: var(--display); font-variation-settings: "wdth" 100; font-size: 22px; font-weight: 800; margin-top: 4px; white-space: nowrap }
+.tile.gold .v { color: var(--gold) }
+ul.why { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px }
+ul.why li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--slab); border-radius: 8px; border-left: 2px solid var(--gold) }
+ul.why li .amt { color: var(--gold); font-weight: 750; white-space: nowrap }
+.loot { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px }
+.loot .store h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .18em; color: var(--gold); text-transform: uppercase }
+.loot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px }
+.loot li label { display: flex; gap: 10px; align-items: center; padding: 8px 6px; border-radius: 6px; cursor: pointer }
+.loot li input { accent-color: var(--gold); width: 18px; height: 18px }
+.loot li input:checked + span { text-decoration: line-through; color: var(--dim) }
+.loot li .q { margin-left: auto; color: var(--dim); font-size: 13px; white-space: nowrap }
+table.opts { width: 100%; border-collapse: collapse }
+table.opts td { padding: 9px 4px; border-bottom: 1px solid var(--line) }
+table.opts tr:first-child td { color: var(--gold); font-weight: 750 }
+table.opts .bar { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--gold), rgba(206,174,51,.35)) }
+table.opts .gap { color: var(--dim); font-size: 13px; white-space: nowrap; text-align: right }
+.tip { color: var(--dim); font-size: 13px }
+.tip b { color: var(--gold); letter-spacing: .14em; font-size: 11px }
+.empty-cta { display: grid; gap: 12px; justify-items: start }
+
+/* LOADOUT */
+.items { display: grid; gap: 8px }
+.item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; background: var(--slab); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; cursor: pointer }
+.item[aria-pressed="true"] { border-color: var(--gold); background: linear-gradient(90deg, rgba(206,174,51,.12), var(--slab) 60%) }
+.item .tick { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); display: grid; place-items: center; color: var(--gold-ink) }
+.item[aria-pressed="true"] .tick { background: var(--gold); border-color: var(--gold) }
+.item .qty { display: flex; align-items: center; gap: 6px }
+.item .qty button { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--void); cursor: pointer }
+.item .qty span { min-width: 64px; text-align: center; font-size: 13px }
+.sub { color: var(--dim); font-size: 12px }
+
+/* LOG */
+.storepick { display: flex; flex-wrap: wrap; gap: 8px }
+.chip { border: 1px solid var(--line); background: var(--slab-2); border-radius: 999px; padding: 9px 14px; cursor: pointer; font-weight: 650 }
+.chip[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); border-color: var(--gold) }
+.finder { position: relative }
+.finder ul { list-style: none; margin: 6px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--slab-2); max-height: 230px; overflow: auto }
+.finder li button { width: 100%; text-align: left; background: none; border: 0; padding: 9px 10px; border-radius: 6px; cursor: pointer }
+.finder li button:hover, .finder li button:focus-visible { background: rgba(206,174,51,.12) }
+.rows { display: grid; gap: 6px }
+.row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; background: var(--slab); border-radius: 8px; border-left: 3px solid var(--ok) }
+.row.warn { border-left-color: var(--dim) } .row.bad { border-left-color: var(--bad) }
+.row .x { background: none; border: 0; color: var(--dim); cursor: pointer; font-size: 18px; padding: 4px 8px }
+.toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--gold); color: var(--gold-ink);
+  padding: 10px 16px; border-radius: 999px; font-weight: 700; z-index: 20; max-width: calc(100% - 32px) }
+details.more summary { cursor: pointer; color: var(--gold); font-weight: 650 }
+
+/* SETUP */
+.storecard { display: grid; gap: 12px }
+.storecard h3 { margin: 0; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold) }
+.toggle { display: flex; align-items: center; gap: 10px; font-weight: 650; cursor: pointer }
+.toggle input { accent-color: var(--gold); width: 20px; height: 20px }
+
+/* HELP */
+.help { position: fixed; inset: 0; background: rgba(5,6,8,.86); z-index: 30; display: grid; place-items: center;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+.helpbox { width: min(560px, 100%); max-height: 100%; display: grid; grid-template-rows: auto 1fr auto; background: var(--slab); border: 1px solid #3a2f52; border-radius: 14px; overflow: hidden }
+.helphead { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line) }
+.cards { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none }
+.cards::-webkit-scrollbar { display: none }
+.hcard { scroll-snap-align: start; padding: 18px 18px 8px; overflow-y: auto; display: grid; gap: 10px; align-content: start }
+.hcard h3 { margin: 0; font-family: var(--display); font-variation-settings: "wdth" 115; font-size: 20px; color: var(--gold); text-wrap: balance }
+.hcard ol, .hcard ul { margin: 0; padding-left: 20px; display: grid; gap: 7px }
+.hcard .ex { background: var(--violet); border-radius: 8px; padding: 10px 12px; border: 1px solid #3a2f52 }
+.hcard .ex b { display: block; font-size: 10px; letter-spacing: .2em; color: var(--gold); margin-bottom: 4px }
+.helpfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line) }
+.dots { display: flex; gap: 6px } .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line) } .dots i.on { background: var(--gold) }
+.getit .qr { background: #fff; padding: 10px; border-radius: 8px; width: max-content }
+footer.foot { color: var(--dim); font-size: 11px; text-align: center; margin-top: 28px }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">GROCERY DIRECTOR<small id="dateLine"></small></div>
+    <div class="spacer"></div>
+    <nav class="tabs" role="tablist" aria-label="Screens">
+      <button role="tab" data-tab="today" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M12 22V12M3 7l9 5 9-5"/></svg>Today</button>
+      <button role="tab" data-tab="loadout" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Loadout</button>
+      <button role="tab" data-tab="log" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>Log</button>
+      <button role="tab" data-tab="setup" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Setup</button>
+      <button role="tab" data-tab="help" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg>Help</button>
+    </nav>
+  </header>
+
+  <div id="demo" class="demo" hidden>
+    <p><b>Demo.</b> This is the worked example. Your own copy starts empty and keeps your prices on your device.</p>
+    <button class="btn gold" id="getPc">Download for PC</button>
+    <button class="btn" id="getPhone">Get it on a phone</button>
+  </div>
+
+  <main id="app"></main>
+  <footer class="foot">Fan-made. Destiny 2 belongs to Bungie; not affiliated. No AI: every answer is plain math on your own prices. Starting estimates: U.S. BLS Average Price Data.</footer>
+</div>
+<div id="overlay"></div>
+
+<script>
+/* Grocery Director decision engine - pure and deterministic, no AI.
+ * decide(state, catalog) -> { mode, head, sub, tier, flavor, tip, why, whyHead, total, ... }
+ * A line-for-line port of the Excel workbook (build_director.py), which is the answer key:
+ * same arithmetic order, same tie-breaks, same text. Runs in the browser and in Node. */
+(function (root) {
+  "use strict";
+
+  const FLAVOR = {
+    one: ["The Tower can wait. Your loadout can't.", "Boots on the ground. Cart in hand.", "Old-school patrol. Still the best deal."],
+    pickup: ["In, out, no patrol required.", "Your loot is staged at the landing zone.", "Pop the trunk, Guardian."],
+    delivery: ["Let the cargo come to you.", "Orbit holds. Supplies inbound.", "Why fly when they'll drop it at your door?"],
+    split: ["Two drops, one run.", "Divide and conquer the checkout.", "A raid needs a plan. So does this."],
+    wash: ["Same loot either way. Take the short path.", "Coin flip. Ghost picks the easy road.", "No wrong answer today."],
+  };
+  const TIPS = ["Clear old x's on Loadout before a new run.", "Sales vanish after their end date - like Xûr.",
+    "18 ct eggs? Size 18, Unit ct. Ghost does the math.", "Never use delivery? Leave it blank on Destinations.",
+    "Red Status in the Vault = fix it before trusting the call.", "Bigger savings = rarer run. Chase that Exotic.",
+    "INTEL 3/6 = only 3 of today's items have real prices there.", "Your time counts. Change $/hour on Orbit."];
+  const REGIONS = ["US", "Northeast", "Midwest", "South", "West"];
+
+  // ---------- Excel-compatible helpers ----------
+  const eq = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();   // Excel text compare
+  const N = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+  const blank = (v) => v === null || v === undefined || v === "";
+  const serial = (iso) => {                                   // Excel date serial (days since 1899-12-30)
+    if (blank(iso)) return 0;
+    const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+    return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
+  };
+  const isoOf = (s) => new Date(Date.UTC(1899, 11, 30) + s * 86400000).toISOString().slice(0, 10);
+  function text2(x) {                                         // TEXT(x,"0.00"): Excel rounds the 15-digit value half away from zero
+    const v = Number(Number(x).toPrecision(15));
+    const sign = v < 0 ? -1 : 1;
+    let str = Math.abs(v).toString();
+    if (str.includes("e")) str = Math.abs(v).toFixed(20);
+    const [ip, fp = ""] = str.split(".");
+    const digits = (fp + "000").slice(0, 3);
+    let cents = BigInt(ip) * 100n + BigInt(digits.slice(0, 2));
+    if (Number(digits[2]) >= 5) cents += 1n;
+    const s = (cents / 100n).toString() + "." + (cents % 100n).toString().padStart(2, "0");
+    return (sign < 0 && cents !== 0n ? "-" : "") + s;
+  }
+  const numStr = (x) => String(Number(Number(x).toPrecision(15)));   // Excel "&" of a number (General format)
+  function median(arr) {                                      // AGGREGATE(17,..,2) = QUARTILE.INC(.., 2)
+    if (!arr.length) return null;
+    const a = arr.slice().sort((p, q) => p - q);
+    const h = (a.length - 1) / 2, lo = Math.floor(h);
+    return lo === h ? a[lo] : a[lo] + (h - lo) * (a[lo + 1] - a[lo]);
+  }
+  const minOf = (arr) => (arr.length ? Math.min(...arr) : null);
+
+  // ---------- the decision ----------
+  function decide(state, catalog) {
+    const set = state.settings;
+    const run = serial(set.runDate);
+    const units = Object.fromEntries(catalog.units.map((u) => [u[0].toLowerCase(), { fam: u[1], f: u[2] }]));
+    const itemOf = (name) => catalog.items.find((it) => eq(it.name, name));
+    const estOf = (name) => {
+      const it = itemOf(name);
+      if (!it) return 0;
+      const reg = REGIONS.findIndex((r) => eq(r, set.region));
+      const us = it.est.US;
+      const v = reg < 0 ? us : (blank(it.est[REGIONS[reg]]) ? us : it.est[REGIONS[reg]]);
+      return N(v);
+    };
+
+    // Vault rows -> unit price + live flag (tLog calculated columns)
+    const log = (state.log || []).map((r) => {
+      const out = { ...r, up: "", live: "no" };
+      if (blank(r.item)) return out;
+      const it = itemOf(r.item);
+      const pu = it ? it.priceUnit : "?";
+      const sizeUsed = blank(r.size) ? (it ? it.usualSize : "") : r.size;
+      const unitUsed = !blank(r.unit) ? r.unit : (blank(r.size) ? (it ? it.usualUnit : "") : pu);
+      if (N(sizeUsed) === 0) return out;
+      const uu = units[String(unitUsed).toLowerCase()], pp = units[String(pu).toLowerCase()];
+      if ((uu ? uu.fam : "x") !== (pp ? pp.fam : "y")) return out;
+      const amount = (blank(r.qty) ? 1 : r.qty) * sizeUsed * uu.f / pp.f;
+      if (!(N(amount) > 0 && N(r.price) > 0)) return out;
+      out.up = r.price / amount;
+      const d = serial(r.date);
+      if (d > run) out.live = "future";
+      else if (d < run - set.window) out.live = "stale";
+      else if (eq(r.type, "Sale") && (blank(r.saleEnds) ? d + 6 : serial(r.saleEnds)) < run) out.live = "sale over";
+      else out.live = "yes";
+      return out;
+    });
+    const live = log.filter((r) => r.live === "yes");
+    const isSale = (r) => eq(r.type, "Sale");
+
+    const slots = set.slots.map((s) => s || "");
+    const store = (name) => {
+      const st = Object.entries(state.stores || {}).find(([k]) => eq(k, name));
+      return st ? st[1] : null;
+    };
+
+    // Loadout rows (tLoadout)
+    const lo = (state.loadout || []).map((r, i) => {
+      const row = 4 + i;
+      const T = !blank(r.today) && r.today !== false && !blank(r.item) ? 1 : 0;
+      const it = itemOf(r.item);
+      const q = blank(r.qty) ? 1 : r.qty;
+      const regular = live.filter((x) => eq(x.item, r.item) && !isSale(x)).map((x) => x.up);
+      const fallback = regular.length ? median(regular) : estOf(r.item);
+      const P = [], S = [];
+      slots.forEach((sl) => {
+        if (sl === "") { P.push(0); S.push(0); return; }
+        const here = live.filter((x) => eq(x.item, r.item) && eq(x.store, sl));
+        const sales = here.filter(isSale).map((x) => x.up);
+        const regs = here.filter((x) => !isSale(x)).map((x) => x.up);
+        P.push(sales.length ? minOf(sales) : regs.length ? median(regs) : fallback);
+        S.push(here.length ? 1 : 0);
+      });
+      return { row, item: r.item, T, q, P, S, priceUnit: it ? it.priceUnit : "?" };
+    });
+    const todayN = lo.reduce((a, r) => a + r.T, 0);
+
+    // per-store totals (Orbit rows 19-22)
+    const slot = slots.map((sl, k) => {
+      if (sl === "") return { name: "", empty: true, Y: 0, C: "", D: "", E: "", H: "", I: "", AC: 0 };
+      const st = store(sl) || {};
+      const C = lo.reduce((a, r) => a + r.T * r.q * r.P[k], 0);
+      const AF = N(st.miles) * set.perMile + N(st.driveMin) / 60 * set.perHour;            // drive cost
+      const D = store(sl) ? AF + N(st.shopMin) / 60 * set.perHour : 0;                      // trip cost
+      const AC = lo.reduce((a, r) => a + r.T * r.S[k], 0);
+      const Y = todayN === 0 ? 0 : (AC > 0 && AC * 2 >= todayN ? 1 : 0);
+      const AH = N(st.pickupFee), AI = N(st.pickupWait), AJ = N(st.pickupMarkup), AL = N(st.deliveryFee),
+        AM = N(st.serviceFee), AN = N(st.tip), AO = N(st.deliveryMarkup), AP = N(st.minOrder), AQ = N(st.shopMin);
+      const yes = (v) => String(v ?? "").trim().toUpperCase().startsWith("Y") || v === true;
+      const H = yes(st.pickup) && !(N(C) < AP) ? C * (1 + AJ) + AH + N(AF) + (AI + set.orderMin) / 60 * set.perHour + set.subHassle : "";
+      const I = yes(st.delivery) && !(N(C) < AP) ? C * (1 + AO) * (1 + AM) + AL + AN + set.orderMin / 60 * set.perHour + set.subHassle : "";
+      return {
+        name: sl, Y, C, D: N(D), E: C + N(D), H, I, AC, AF: N(AF), AI,
+        BB: AQ / 60 * set.perHour, BC: AH + N(C) * AJ, BD: N(AF) + (AI + set.orderMin) / 60 * set.perHour + set.subHassle,
+        BE: AL + AN + N(C) * ((1 + AO) * (1 + AM) - 1), BF: set.orderMin / 60 * set.perHour + set.subHassle,
+      };
+    });
+
+    // option grid: 4 stores x (in person, pickup, delivery), rows 19-30
+    const hows = ["in person", "pickup", "delivery"];
+    const grid = [];
+    for (let i = 0; i < 12; i++) {
+      const k = i % 4, how = hows[Math.floor(i / 4)], s = slot[k];
+      const src = how === "in person" ? s.E : how === "pickup" ? s.H : s.I;
+      grid.push({
+        row: 19 + i, k, how,
+        label: s.name === "" ? "" : how === "in person" ? s.name : s.name + " " + how,
+        AV: s.Y === 1 && typeof src === "number" ? src : "",
+        AW: how === "in person" ? N(s.D) : how === "pickup" ? s.AF + (s.AI + set.orderMin) / 60 * set.perHour : set.orderMin / 60 * set.perHour,
+      });
+    }
+    const avs = grid.filter((g) => g.AV !== "").map((g) => g.AV);
+    const bestTot = avs.length ? Math.min(...avs) : "";
+    const bestOpt = bestTot === "" ? 0 : grid.findIndex((g) => g.AV === bestTot) + 1;
+    grid.forEach((g) => {
+      g.AX = g.AV === "" ? 0 : (g.AV <= bestTot + set.thr + 0.0001 ? 1 : 0);
+      g.AY = g.AX === 1 ? g.AW * 1000 + g.row / 1000 : 1e9;
+    });
+    const minKey = Math.min(...grid.map((g) => g.AY));
+    const chosenOpt = grid.findIndex((g) => g.AY === minKey) + 1;
+    const washN = grid.reduce((a, g) => a + g.AX, 0);
+    const pool = grid.filter((g) => g.AV !== "" && g.row - 18 !== bestOpt).map((g) => g.AV);
+    const runnerTot = pool.length ? Math.min(...pool) : "";
+    const runnerOpt = runnerTot === "" ? 0 : grid.findIndex((g) => g.AV !== "" && g.row - 18 !== bestOpt && g.AV === runnerTot) + 1;
+
+    // two-store in-person splits
+    const pairs = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]].map(([a, b]) => {
+      const valid = slot[a].Y === 1 && slot[b].Y === 1;
+      let tot = "";
+      if (valid) {
+        let sum = 0;
+        lo.forEach((r) => {
+          const A = r.P[a], B = r.P[b], sA = r.S[a], sB = r.S[b];
+          const pick = sA * sB * (A + B - Math.abs(A - B)) / 2 + sA * (1 - sB) * A + (1 - sA) * sB * B + (1 - sA) * (1 - sB) * A;
+          sum += r.T * r.q * pick;
+        });
+        tot = sum + slot[a].D + slot[b].D;
+      }
+      return { a, b, tot };
+    });
+    const pts = pairs.filter((p) => p.tot !== "").map((p) => p.tot);
+    const bestSplit = pts.length ? Math.min(...pts) : "";
+    const splitRow = bestSplit === "" ? 0 : pairs.findIndex((p) => p.tot === bestSplit) + 1;
+    const splitA = splitRow ? pairs[splitRow - 1].a + 1 : 0, splitB = splitRow ? pairs[splitRow - 1].b + 1 : 0;
+
+    const anyElig = slot.some((s) => s.Y === 1);
+    const mode = todayN === 0 ? "empty" : !anyElig ? "nodata"
+      : bestSplit !== "" && bestSplit < bestTot - set.thr - 0.0001 ? "split" : washN > 1 ? "wash" : "one";
+
+    const G = (i) => grid[i - 1];
+    const recS = chosenOpt ? G(chosenOpt).k + 1 : 0;
+    const recHow = chosenOpt ? G(chosenOpt).how : "";
+    const recLabel = chosenOpt ? G(chosenOpt).label : "";
+    const recHassle = chosenOpt ? G(chosenOpt).AW : 0;
+    const recTot = chosenOpt ? G(chosenOpt).AV : 0;
+    const recName = recS ? slots[recS - 1] : "";
+    const bestName = bestOpt ? G(bestOpt).label : "";
+    const runnerName = runnerOpt ? G(runnerOpt).label : "";
+    const cmpR = recHow === "in person" && runnerOpt > 0 && G(runnerOpt).how === "in person" ? G(runnerOpt).k + 1 : "";
+    const recTrip = recS ? slot[recS - 1].D : 0;
+    const splitAName = splitA ? slots[splitA - 1] : "", splitBName = splitB ? slots[splitB - 1] : "";
+
+    // per-item buy-at, gains, lists
+    lo.forEach((r) => {
+      r.buyAt = ""; r.gain = ""; r.key = "";
+      if (r.T === 0) return;
+      if (mode === "split") {
+        const sa = r.S[splitA - 1], sb = r.S[splitB - 1];
+        r.buyAt = sa * sb ? (r.P[splitA - 1] <= r.P[splitB - 1] ? splitAName : splitBName) : sa ? splitAName : sb ? splitBName : "Either";
+      } else if (mode === "one" || mode === "wash") r.buyAt = recName;
+      r.gain = "";
+      if (mode === "one" && cmpR !== "" && recS) {
+        r.gain = r.q * (r.P[cmpR - 1] - r.P[recS - 1]) * r.S[recS - 1] * r.S[cmpR - 1];
+      }
+      r.key = N(r.gain) > 0.0049 ? r.gain + r.row / 1e7 : "";
+    });
+    const ranked = lo.filter((r) => r.key !== "").sort((p, q) => q.key - p.key);
+    const gItem = (i) => (ranked[i - 1] ? ranked[i - 1].item : ""), gAmt = (i) => (ranked[i - 1] ? ranked[i - 1].gain : 0);
+    const line = (r) => r.item + "  ·  " + numStr(r.q) + " " + r.priceUnit;
+    const shop = slots.map((sl) => lo.filter((r) => r.T === 1 && sl !== "" && eq(r.buyAt, sl)).map(line).join("\n"));
+    const shopAny = lo.filter((r) => r.T === 1 && eq(r.buyAt, "Either")).map(line).join("\n");
+
+    // screen text
+    const scrIdxA = mode === "split" ? splitA : (mode === "one" || mode === "wash") ? recS : 0;
+    const scrIdxB = mode === "split" ? splitB : 0;
+    const scrNameA = scrIdxA ? slots[scrIdxA - 1] : "", scrNameB = scrIdxB ? slots[scrIdxB - 1] : "";
+    const U = (s) => String(s).toUpperCase();
+    const head = mode === "empty" ? "LOADOUT EMPTY" : mode === "nodata" ? "NEED MORE INTEL"
+      : mode === "split" ? U(scrNameA) + " + " + U(scrNameB)
+      : recHow === "pickup" ? "PICKUP AT " + U(scrNameA) : recHow === "delivery" ? "ORDER " + U(scrNameA) + " DELIVERY" : "GO TO " + U(scrNameA);
+    const sub = mode === "empty" ? "Mark what you need on Loadout" : mode === "nodata" ? "Log prices in the Vault"
+      : mode === "split" ? "Save $" + text2(bestTot - bestSplit) + " vs " + bestName + " alone"
+      : mode === "wash" ? "Too close to call - easiest option wins"
+      : runnerTot === "" ? "Only store with enough intel" : "Save $" + text2(runnerTot - recTot) + " vs " + runnerName;
+    const save = mode === "split" ? bestTot - bestSplit : mode === "one" && runnerTot !== "" ? runnerTot - recTot : 0;
+    const tier = mode === "empty" || mode === "nodata" ? "" :
+      (save >= 20 ? "EXOTIC" : save >= 10 ? "LEGENDARY" : save >= 5 ? "RARE" : save >= 2 ? "UNCOMMON" : "COMMON") + " RUN";
+    const pickF = (key) => FLAVOR[key][run % 3];
+    const flavor = mode === "empty" ? "Your inventory is empty, Guardian." : mode === "nodata" ? "Ghost needs more scans."
+      : mode === "split" ? pickF("split") : mode === "wash" ? pickF("wash") : recHow === "pickup" ? pickF("pickup")
+      : recHow === "delivery" ? pickF("delivery") : pickF("one");
+    const R = recS ? slot[recS - 1] : null;
+    const brk = mode !== "one" || !R || R.empty ? ["", "", ""] : recHow === "pickup"
+      ? ["Skips $" + text2(R.BB) + " of shopping time", "Pickup fee + markup $" + text2(R.BC), "Drive, wait, order + sub risk $" + text2(R.BD)]
+      : recHow === "delivery"
+        ? ["Skips a $" + text2(recTrip) + " drive (gas + time)", "Fees + tip + markup $" + text2(R.BE), "Order time + sub risk $" + text2(R.BF)]
+        : ["Trip $" + text2(recTrip) + " (gas + time)", "No fees, markup or subs", ""];
+    const gl = (i) => gItem(i) + "   -$" + text2(gAmt(i));
+    const washList = grid.filter((g) => g.AX === 1).map((g) => g.label).filter((s) => s !== "").join(" and ");
+    let why;
+    if (mode === "one") why = gItem(1) === "" ? brk : [gl(1), gItem(2) === "" ? "" : gl(2), gItem(3) === "" ? "" : gl(3)];
+    else if (mode === "wash") why = ["Easiest: " + recLabel + " ($" + text2(recHassle) + " time + gas)", "Within $" + text2(set.thr) + ": " + washList, ""];
+    else if (mode === "split") why = ["Split total $" + text2(bestSplit) + " vs " + bestName + " alone $" + text2(bestTot), "Both trips counted", ""];
+    else why = ["", "", ""];
+    const whyHead = mode === "one" && gItem(1) !== "" ? "WHY  //  BIGGEST WINS VS " + U(runnerName)
+      : (mode === "one" || mode === "wash" || mode === "split") ? "WHY" : "";
+
+    const optRank = grid.filter((g) => g.AV !== "").map((g) => ({ label: g.label, total: g.AV, key: g.AV + g.row / 1e6, how: g.how }))
+      .sort((p, q) => p.key - q.key).slice(0, 6).map((o) => ({ ...o, gap: o.total - bestTot }));
+    const total = mode === "split" ? bestSplit : (mode === "one" || mode === "wash") ? recTot : "";
+    const intel = scrIdxA ? slot[scrIdxA - 1].AC + "/" + todayN + (scrIdxB ? "  ·  " + slot[scrIdxB - 1].AC + "/" + todayN : "") : "";
+    const newestAt = (nm) => Math.max(0, ...live.filter((x) => eq(x.store, nm)).map((x) => serial(x.date)));
+    const newest = scrIdxA ? Math.max(newestAt(scrNameA), scrIdxB ? newestAt(scrNameB) : 0) : 0;
+    const listHeadA = U(scrNameA) + (mode !== "split" && scrIdxA > 0 && recHow !== "in person" ? "  (" + U(recHow) + ")" : "");
+
+    return {
+      mode, how: recHow, head, sub, tier, flavor, tip: "TIP  ▸  " + TIPS[run % 8], why, whyHead,
+      total, intel, newest: newest ? isoOf(newest) : "", save,
+      listHeadA, listA: scrIdxA ? shop[scrIdxA - 1] : "", listHeadB: U(scrNameB), listB: scrIdxB ? shop[scrIdxB - 1] : "", listAny: shopAny,
+      options: optRank, todayN,
+      stores: slot.map((s) => ({ name: s.name, groceries: s.C, trip: s.D, inPerson: s.name === "" ? "" : s.E, pickup: s.H, delivery: s.I,
+        realPrices: s.AC, eligible: s.Y === 1 })),
+      vault: log.map((r) => ({ unitPrice: r.up, live: r.live })),
+      loadout: lo.map((r) => ({ item: r.item, buyAt: r.buyAt, prices: r.P, seen: r.S })),
+    };
+  }
+
+  const api = { decide, text2, serial, median, FLAVOR, TIPS };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.GDEngine = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+const CATALOG = {"units":[["oz","weight",1],["lb","weight",16],["g","weight",0.035274],["kg","weight",35.274],["fl oz","volume",1],["pt","volume",16],["qt","volume",32],["half gal","volume",64],["gal","volume",128],["L","volume",33.814],["ml","volume",0.033814],["ct","count",1],["dozen","count",12]],"stores":["Walmart","Kroger","Aldi","Costco","Sam's Club","Target","Whole Foods","Trader Joe's","Farmers Market"],"items":[{"name":"Eggs, large","category":"Dairy & eggs","priceUnit":"dozen","usualSize":1,"usualUnit":"dozen","est":{"US":2.272,"Northeast":"","Midwest":"","South":2.368,"West":""}},{"name":"Milk, whole","category":"Dairy & eggs","priceUnit":"gal","usualSize":1,"usualUnit":"gal","est":{"US":4.106,"Northeast":"","Midwest":"","South":3.901,"West":4.621}},{"name":"Milk, 2% / skim","category":"Dairy & eggs","priceUnit":"gal","usualSize":1,"usualUnit":"gal","est":{"US":3.59,"Northeast":"","Midwest":"","South":"","West":3.619}},{"name":"Butter","category":"Dairy & eggs","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":3.959,"Northeast":"","Midwest":"","South":"","West":""}},{"name":"Cheddar cheese","category":"Dairy & eggs","priceUnit":"lb","usualSize":8,"usualUnit":"oz","est":{"US":6.133,"Northeast":"","Midwest":"","South":5.533,"West":7.551}},{"name":"Ice cream","category":"Frozen","priceUnit":"gal","usualSize":48,"usualUnit":"fl oz","est":{"US":11.862,"Northeast":"","Midwest":"","South":10.896,"West":14.274}},{"name":"Bread, white","category":"Bakery & pantry","priceUnit":"lb","usualSize":20,"usualUnit":"oz","est":{"US":1.83,"Northeast":1.921,"Midwest":1.658,"South":1.748,"West":2.115}},{"name":"Bread, whole wheat","category":"Bakery & pantry","priceUnit":"lb","usualSize":20,"usualUnit":"oz","est":{"US":2.814,"Northeast":"","Midwest":"","South":"","West":""}},{"name":"Rice, white","category":"Bakery & pantry","priceUnit":"lb","usualSize":2,"usualUnit":"lb","est":{"US":1.118,"Northeast":"","Midwest":"","South":1.218,"West":""}},{"name":"Pasta","category":"Bakery & pantry","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":1.375,"Northeast":"","Midwest":"","South":1.283,"West":""}},{"name":"Flour","category":"Bakery & pantry","priceUnit":"lb","usualSize":5,"usualUnit":"lb","est":{"US":0.545,"Northeast":"","Midwest":"","South":0.486,"West":""}},{"name":"Sugar","category":"Bakery & pantry","priceUnit":"lb","usualSize":4,"usualUnit":"lb","est":{"US":1.019,"Northeast":"","Midwest":"","South":1.061,"West":0.994}},{"name":"Dried beans","category":"Bakery & pantry","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":1.669,"Northeast":"","Midwest":"","South":1.752,"West":1.372}},{"name":"Coffee, ground","category":"Bakery & pantry","priceUnit":"lb","usualSize":12,"usualUnit":"oz","est":{"US":9.332,"Northeast":"","Midwest":"","South":"","West":""}},{"name":"Soda","category":"Drinks","priceUnit":"L","usualSize":2,"usualUnit":"L","est":{"US":1.137,"Northeast":"","Midwest":"","South":0.972,"West":""}},{"name":"Ground beef","category":"Meat","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":6.792,"Northeast":7.016,"Midwest":6.753,"South":6.501,"West":6.926}},{"name":"Chicken breast, boneless","category":"Meat","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":4.203,"Northeast":3.957,"Midwest":3.84,"South":4.146,"West":4.739}},{"name":"Chicken, whole","category":"Meat","priceUnit":"lb","usualSize":5,"usualUnit":"lb","est":{"US":2.064,"Northeast":2.148,"Midwest":2.149,"South":1.947,"West":2.177}},{"name":"Pork chops","category":"Meat","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":4.219,"Northeast":4.223,"Midwest":4.444,"South":4.138,"West":4.192}},{"name":"Bacon","category":"Meat","priceUnit":"lb","usualSize":12,"usualUnit":"oz","est":{"US":6.756,"Northeast":7.926,"Midwest":6.504,"South":6.188,"West":7.014}},{"name":"Bananas","category":"Produce","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":0.656,"Northeast":0.689,"Midwest":0.625,"South":0.616,"West":0.725}},{"name":"Oranges, navel","category":"Produce","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":1.723,"Northeast":1.632,"Midwest":1.875,"South":1.697,"West":1.453}},{"name":"Potatoes","category":"Produce","priceUnit":"lb","usualSize":5,"usualUnit":"lb","est":{"US":0.989,"Northeast":1.011,"Midwest":0.873,"South":1.027,"West":1.006}},{"name":"Tomatoes","category":"Produce","priceUnit":"lb","usualSize":1,"usualUnit":"lb","est":{"US":1.992,"Northeast":2.603,"Midwest":2.031,"South":2.006,"West":""}}],"staples":[{"item":"Eggs, large","qty":1},{"item":"Milk, whole","qty":2},{"item":"Bread, white","qty":1.25},{"item":"Chicken breast, boneless","qty":3},{"item":"Ground beef","qty":2},{"item":"Bananas","qty":3},{"item":"Potatoes","qty":5},{"item":"Cheddar cheese","qty":1},{"item":"Butter","qty":1},{"item":"Bacon","qty":1},{"item":"Rice, white","qty":2},{"item":"Coffee, ground","qty":1}],"blsPeriod":"2026-September"};
+const STORE_KEY = "grocery-director.v1";
+const IN_ARTIFACT = !!window.claude;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const money = (v) => "$" + GDEngine.text2(v);
+const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const runDate = () => { try { return localStorage.getItem("grocery-director.runDate") || todayISO(); } catch { return todayISO(); } };
+
+function freshState() {
+  return {
+    settings: { thr: 2, perMile: 0.2, perHour: 15, region: "US", window: 90, orderMin: 10, subHassle: 3, slots: ["", "", "", ""] },
+    stores: {}, log: [], customItems: [],
+    loadout: CATALOG.staples.map((s) => ({ item: s.item, qty: s.qty, today: false })),
+    ui: { lastStore: "", tab: "today" },
+  };
+}
+function demoState() {           // the README worked example, dated relative to today so it never goes stale
+  const t = runDate(), d = (n) => addDays(t, -n);
+  const s = freshState();
+  s.settings.slots = ["Walmart", "Kroger", "Aldi", "Costco"];
+  s.stores = {
+    Walmart: { miles: 6, driveMin: 6, shopMin: 4, pickup: true, pickupFee: 0, pickupWait: 5, pickupMarkup: 0, delivery: true, deliveryFee: 9.95, serviceFee: 0, tip: 5, deliveryMarkup: 0, minOrder: 35 },
+    Kroger: { miles: 4, driveMin: 5, shopMin: 3, pickup: true, pickupFee: 0, pickupWait: 5, pickupMarkup: 0, delivery: true, deliveryFee: 3.99, serviceFee: 0.05, tip: 5, deliveryMarkup: 0.2, minOrder: 10 },
+    Aldi: { miles: 8, driveMin: 8, shopMin: 4 },
+  };
+  const L = (days, store, item, size, unit, price, extra = {}) => ({ date: d(days), store, item, qty: null, size, unit, price, type: "", saleEnds: null, ...extra });
+  s.log = [
+    L(6, "Walmart", "Eggs, large", null, null, 3.00), L(6, "Walmart", "Milk, whole", 1, "gal", 3.50),
+    L(6, "Walmart", "Chicken breast, boneless", 3, "lb", 12.00), L(6, "Walmart", "Ground beef", 2, "lb", 11.00),
+    L(6, "Walmart", "Bananas", 2.5, "lb", 1.50), L(6, "Walmart", "Coffee, ground", 12, "oz", 7.50),
+    L(2, "Walmart", "Eggs, large", null, null, 2.50, { type: "Sale", saleEnds: addDays(t, 5) }),
+    L(141, "Walmart", "Chicken breast, boneless", 3, "lb", 3.00),
+    L(8, "Kroger", "Eggs, large", 18, "ct", 4.80), L(8, "Kroger", "Milk, whole", 128, "fl oz", 3.80),
+    L(8, "Kroger", "Chicken breast, boneless", 2, "lb", 7.00), L(8, "Kroger", "Ground beef", null, null, 5.00),
+    L(8, "Kroger", "Bananas", 3, "lb", 1.80), L(8, "Kroger", "Coffee, ground", 2, "lb", 18.00),
+    L(12, "Kroger", "Ground beef", 1, "lb", 2.00, { type: "Sale", saleEnds: addDays(t, -5) }),
+    L(4, "Aldi", "Eggs, large", 12, "ct", 2.00), L(4, "Aldi", "Milk, whole", null, null, 3.00),
+    L(4, "Aldi", "Chicken breast, boneless", 3, "lb", 13.50), L(4, "Aldi", "Ground beef", 2, "lb", 12.00),
+    L(4, "Aldi", "Bananas", 2, "lb", 1.00),
+  ];
+  const today = { "Eggs, large": 1, "Milk, whole": 2, "Chicken breast, boneless": 3, "Ground beef": 2, "Bananas": 3, "Coffee, ground": 1 };
+  s.loadout = [...Object.entries(today).map(([item, qty]) => ({ item, qty, today: true })),
+    { item: "Rice, white", qty: 2, today: false }, { item: "Butter", qty: 1, today: false }];
+  s.ui.lastStore = "Kroger";
+  return s;
+}
+
+let state;
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } catch {}
+  return IN_ARTIFACT ? demoState() : freshState();
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
+const catalog = () => ({ units: CATALOG.units, items: CATALOG.items.concat(state.customItems || []) });
+const itemNames = () => catalog().items.map((i) => i.name);
+const unitOf = (name) => (catalog().items.find((i) => i.name === name) || {}).priceUnit || "";
+
+function engineInput() {
+  const st = {};
+  for (const [k, v] of Object.entries(state.stores)) st[k] = { ...v, pickup: v.pickup ? "Yes" : "", delivery: v.delivery ? "Yes" : "" };
+  return { settings: { ...state.settings, runDate: runDate() }, stores: st, log: state.log,
+    loadout: state.loadout.map((r) => ({ item: r.item, qty: r.qty, today: r.today ? "x" : null })) };
+}
+
+// ---------------- screens ----------------
+const TIER = { EXOTIC: "--r-exotic", LEGENDARY: "--r-legendary", RARE: "--r-rare", UNCOMMON: "--r-uncommon", COMMON: "--r-common" };
+function renderToday() {
+  const r = GDEngine.decide(engineInput(), catalog());
+  const tierWord = (r.tier || "").split(" ")[0];
+  const hero = $("#app");
+  if (r.mode === "empty" || r.mode === "nodata") {
+    const noStores = state.settings.slots.every((s) => !s);
+    hero.innerHTML = `<section class="screen"><div class="hero enter" data-testid="hero">
+      <div class="planet"></div><div class="eyebrow"><span class="caps">Today's call</span></div>
+      <div class="call" data-testid="call">${noStores ? "WELCOME, GUARDIAN" : esc(r.head)}</div>
+      <div class="save" data-testid="save">${noStores ? "Set up your stores to get your first call" : esc(r.sub)}</div>
+      <div class="quote" data-testid="ghost">${noStores ? "Every run starts in orbit." : esc(r.flavor)}</div></div>
+      <div class="card empty-cta"><h2 class="sec">Next step</h2>
+      ${noStores ? `<p>Start in <b>Setup</b>: pick the stores you shop and how far they are.</p><button class="btn gold" data-go="setup">Open Setup</button>`
+        : r.mode === "empty" ? `<p>Pick what you need today on the <b>Loadout</b>.</p><button class="btn gold" data-go="loadout">Open Loadout</button>`
+        : `<p>Ghost needs real prices for at least half of today's list at a store. Log a few in <b>Log</b>.</p><button class="btn gold" data-go="log">Log a price</button>`}
+      ${IN_ARTIFACT ? "" : `<button class="btn ghost" id="loadDemo">Look around with the example data</button>`}</div>
+      <p class="tip">${tipHtml(r.tip)}</p></section>`;
+    return;
+  }
+  const whyItems = r.why.filter(Boolean).map((w) => {
+    const m = w.match(/^(.*?)\s+(-?\$[\d.,]+)$/);
+    return m ? `<li><span>${esc(m[1])}</span><span class="amt num">${m[2].startsWith("-") ? "−" + esc(m[2].slice(1)) : esc(m[2])}</span></li>` : `<li><span>${esc(w)}</span></li>`;
+  }).join("");
+  const lootCol = (head, body, i) => body ? `<div class="store card"><h3 data-testid="loot-head-${i}">${esc(head)}</h3><ul>${body.split("\n").map((line, j) => {
+    const [name, q] = line.split("  ·  ");
+    return `<li><label><input type="checkbox" id="got-${i}-${j}"><span>${esc(name)}</span><span class="q num">${esc(q)}</span></label></li>`; }).join("")}</ul></div>` : "";
+  const maxGap = Math.max(0, ...r.options.map((o) => o.gap));
+  const opts = r.options.map((o) => `<tr><td>${esc(o.label)}</td><td class="num" style="text-align:right">${money(o.total)}</td>
+    <td style="width:34%"><div class="bar" style="width:${o.gap > 0 ? Math.max(4, (o.gap / maxGap) * 100) : 0}%"></div></td>
+    <td class="gap num">${o.gap > 0.004 ? "+" + money(o.gap) : "★ BEST"}</td></tr>`).join("");
+  hero.innerHTML = `<section class="screen wide"><div class="today">
+    <div class="col">
+      <div class="hero enter" data-testid="hero" style="--tier: var(${TIER[tierWord] || "--r-common"})"><div class="planet"></div>
+        <div class="eyebrow"><span class="caps">Today's call</span><span class="tierchip" data-testid="tier">${esc(r.tier)}</span></div>
+        <div class="call" data-testid="call">${esc(r.head)}</div>
+        <div class="save" data-testid="save">${esc(r.sub)}</div>
+        <div class="quote" data-testid="ghost">${esc(r.flavor)}</div>
+      </div>
+      <div class="tiles">
+        <div class="tile gold"><div class="caps">All-in total</div><div class="v num" data-testid="total">${money(r.total)}</div></div>
+        <div class="tile"><div class="caps">Intel</div><div class="v num" data-testid="intel">${esc(r.intel)}</div></div>
+        <div class="tile"><div class="caps">Last scan</div><div class="v num" data-testid="newest">${r.newest ? esc(new Date(r.newest + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })) : "—"}</div></div>
+      </div>
+      <div class="card"><h2 class="sec" data-testid="why-head">${esc(r.whyHead.replace("WHY  //  ", "Why · "))}</h2><ul class="why" data-testid="why" style="margin-top:12px">${whyItems}</ul></div>
+    </div>
+    <div class="col">
+      <div><h2 class="sec">Loot list</h2><div class="loot" style="margin-top:10px" data-testid="loot">${lootCol(r.listHeadA, r.listA, 0)}${lootCol(r.listHeadB, r.listB, 1)}${lootCol("Anywhere", r.listAny, 2)}</div></div>
+      <div class="card"><h2 class="sec">All options</h2><table class="opts" style="margin-top:8px" data-testid="options">${opts}</table></div>
+      <p class="tip">${tipHtml(r.tip)}</p>
+    </div></div></section>`;
+}
+const tipHtml = (t) => `<b>TIP</b> &nbsp;${esc(t.replace(/^TIP\s+▸\s+/, ""))}`;
+
+function renderLoadout() {
+  const sel = state.loadout.filter((r) => r.today).length;
+  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Loadout</h2><p class="sub">Tap what you need today. Amounts are in each item's unit (lb, gal, dozen).</p></div>
+    <div class="items" data-testid="loadout">${state.loadout.map((r, i) => `
+      <div class="item" role="button" tabindex="0" aria-pressed="${r.today}" data-i="${i}" data-testid="item-${esc(r.item)}">
+        <span class="tick">${r.today ? "✓" : ""}</span><span><b>${esc(r.item)}</b></span>
+        <span class="qty"><button aria-label="Less ${esc(r.item)}" data-dq="-1" data-i="${i}">−</button><span class="num">${GDEngine.text2(r.qty ?? 1).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")} ${esc(unitOf(r.item))}</span><button aria-label="More ${esc(r.item)}" data-dq="1" data-i="${i}">+</button></span>
+      </div>`).join("")}</div>
+    <div class="card" style="display:grid;gap:10px"><label class="f" for="addItem">Add an item to your list</label>
+      <div class="finder"><input type="search" id="addItem" placeholder="Type to find an item" autocomplete="off"><ul id="addList" hidden></ul></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn gold" data-go="today">Show today's call (${sel})</button><button class="btn ghost" id="clearToday">Clear all ticks</button></div></section>`;
+}
+
+function renderLog() {
+  const slots = state.settings.slots.filter(Boolean);
+  const others = CATALOG.stores.filter((s) => !slots.includes(s));
+  const r = GDEngine.decide(engineInput(), catalog());
+  const recent = state.log.map((row, i) => ({ row, i, v: r.vault[i] })).reverse().slice(0, 40);
+  const ls = state.ui.lastStore || slots[0] || "";
+  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Log a price</h2><p class="sub">From a receipt, a shelf tag, the store's website, or this week's ad.</p></div>
+    <form class="card" id="logForm" style="display:grid;gap:14px" autocomplete="off">
+      <div class="f" style="display:grid;gap:6px"><span class="caps">Store</span><div class="storepick" id="storePick">${slots.concat(others).map((s) =>
+        `<button type="button" class="chip" aria-pressed="${s === ls}" data-store="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>
+      <div class="finder"><label class="f" for="logItem">Item</label><input type="search" id="logItem" placeholder="Type to find (e.g. eggs)" required><ul id="logList" hidden></ul></div>
+      <div class="grid2"><label class="f" for="logPrice">Price paid<input type="number" id="logPrice" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required></label>
+        <label class="f" for="logDate">Date<input type="date" id="logDate" value="${runDate()}"></label></div>
+      <details class="more" id="sizeBox"><summary>Not the usual size? <span class="sub" id="usualHint"></span></summary>
+        <div class="grid3" style="margin-top:10px"><label class="f" for="logQty">Packs<input type="number" id="logQty" inputmode="decimal" min="0" step="1" placeholder="1"></label>
+          <label class="f" for="logSize">Size each<input type="number" id="logSize" inputmode="decimal" min="0" step="any" placeholder="e.g. 18"></label>
+          <label class="f" for="logUnit">Unit<select id="logUnit"><option value="">usual</option>${CATALOG.units.map((u) => `<option>${esc(u[0])}</option>`).join("")}</select></label></div></details>
+      <div style="display:grid;gap:8px"><label class="toggle"><input type="checkbox" id="logSale"> It's a sale price</label>
+        <div id="saleBox" hidden style="display:grid;gap:8px"><span class="caps">Sale ends</span><div class="storepick" id="saleQuick"></div>
+          <input type="date" id="logSaleEnds" aria-label="Sale end date"></div></div>
+      <button class="btn gold" type="submit" id="logSave">Save price</button>
+    </form>
+    <div><h2 class="sec">Logged prices</h2><p class="sub">Green = in use today. Grey = too old, ended sale, or a future date. Red = fix it.</p></div>
+    <div class="rows" data-testid="vault">${recent.map(({ row, i, v }) => {
+      const cls = v.unitPrice === "" ? "bad" : v.live === "yes" ? "" : "warn";
+      const note = v.unitPrice === "" ? (unitOf(row.item) ? "unit doesn't fit " + unitOf(row.item) : "unknown item") : v.live === "yes" ? money(v.unitPrice) + " / " + unitOf(row.item) : v.live;
+      return `<div class="row ${cls}"><span><b>${esc(row.item)}</b> <span class="sub">· ${esc(row.store)} · ${esc(row.date)}${row.type === "Sale" ? " · sale" : ""}</span></span>
+        <span class="num">${money(row.price || 0)}</span><button class="x" aria-label="Delete" data-del="${i}">×</button>
+        <span class="sub" style="grid-column:1/-1">${esc(note)}</span></div>`; }).join("") || `<p class="sub">Nothing logged yet.</p>`}</div></section>`;
+}
+
+const STORE_FIELDS = [["miles", "Round-trip miles"], ["driveMin", "Drive min (round trip)"], ["shopMin", "Min inside"]];
+const PICK_FIELDS = [["pickupFee", "Fee $"], ["pickupWait", "Wait min"], ["pickupMarkup", "Markup %", true]];
+const DEL_FIELDS = [["deliveryFee", "Fee $"], ["serviceFee", "Service %", true], ["tip", "Tip $"], ["deliveryMarkup", "Markup %", true], ["minOrder", "Min order $"]];
+function renderSetup() {
+  const s = state.settings;
+  const opt = (v) => `<option value="">—</option>` + CATALOG.stores.map((n) => `<option ${n === v ? "selected" : ""}>${esc(n)}</option>`).join("");
+  const field = (st, [key, label, pct]) => `<label class="f">${esc(label)}<input type="number" inputmode="decimal" step="any" min="0" data-st="${esc(st)}" data-k="${key}" ${pct ? "data-pct" : ""}
+     value="${state.stores[st]?.[key] === undefined || state.stores[st]?.[key] === null ? "" : pct ? +(state.stores[st][key] * 100).toFixed(4) : state.stores[st][key]}"></label>`;
+  const cards = s.slots.filter(Boolean).map((st) => { const v = state.stores[st] || {}; return `<div class="card storecard"><h3>${esc(st)}</h3>
+    <div class="grid3">${STORE_FIELDS.map((f) => field(st, f)).join("")}</div>
+    <label class="toggle"><input type="checkbox" data-st="${esc(st)}" data-flag="pickup" ${v.pickup ? "checked" : ""}> Curbside pickup</label>
+    ${v.pickup ? `<div class="grid3">${PICK_FIELDS.map((f) => field(st, f)).join("")}</div>` : ""}
+    <label class="toggle"><input type="checkbox" data-st="${esc(st)}" data-flag="delivery" ${v.delivery ? "checked" : ""}> Delivery</label>
+    ${v.delivery ? `<div class="grid3">${DEL_FIELDS.map((f) => field(st, f)).join("")}</div>` : ""}</div>`; }).join("");
+  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Your stores</h2><p class="sub">Pick up to 4 stores to compare.</p></div>
+    <div class="card grid2">${[0, 1, 2, 3].map((k) => `<label class="f" for="slot${k}">Store ${k + 1}<select id="slot${k}" data-slot="${k}">${opt(s.slots[k])}</select></label>`).join("")}</div>
+    ${cards || `<p class="sub">Pick a store above to set its distance and pickup or delivery.</p>`}
+    <div><h2 class="sec">Your costs</h2><p class="sub">What your gas and time are worth, so a far store or a long shop is counted fairly.</p></div>
+    <div class="card grid2">
+      <label class="f" for="perMile">Gas per mile $<input type="number" id="perMile" data-set="perMile" step="0.01" min="0" value="${s.perMile}"></label>
+      <label class="f" for="perHour">Your time per hour $<input type="number" id="perHour" data-set="perHour" step="1" min="0" value="${s.perHour}"></label>
+      <label class="f" for="orderMin">Minutes to order online<input type="number" id="orderMin" data-set="orderMin" step="1" min="0" value="${s.orderMin}"></label>
+      <label class="f" for="subHassle">Sub risk per online order $<input type="number" id="subHassle" data-set="subHassle" step="0.5" min="0" value="${s.subHassle}"></label>
+      <label class="f" for="thr">Too close to call $<input type="number" id="thr" data-set="thr" step="0.5" min="0" value="${s.thr}"></label>
+      <label class="f" for="window">Prices count for (days)<input type="number" id="window" data-set="window" step="1" min="1" value="${s.window}"></label>
+      <label class="f" for="region">Region for starting estimates<select id="region" data-set="region">${["US", "Northeast", "Midwest", "South", "West"].map((x) => `<option ${x === s.region ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+    </div>
+    <div><h2 class="sec">Your data</h2><p class="sub">Everything stays on this device. Back it up, or move it to your phone or PC with a backup file.</p></div>
+    <div class="card" style="display:flex;flex-wrap:wrap;gap:10px">
+      <button class="btn" id="backup">Save a backup file</button>
+      <label class="btn" for="restore" style="display:inline-block">Restore from a file<input type="file" id="restore" accept="application/json,.json" hidden></label>
+      <button class="btn ghost" id="loadDemo2">Load the example data</button>
+      <button class="btn danger" id="wipe">Erase everything</button>
+    </div><div id="wipeConfirm"></div></section>`;
+}
+
+const HELP = [
+  ["What it does", ["Tells you where to buy today's groceries: which store, and whether to go in, use curbside pickup, or get delivery.",
+    "It uses only your prices and plain math. No AI, no guessing. Same prices in, same answer out.",
+    "Four screens: <b>Today</b> (the answer), <b>Loadout</b> (what you need), <b>Log</b> (prices), <b>Setup</b> (stores and costs)."],
+    ["You need eggs, milk, chicken, beef, bananas and coffee.", "Today says GO TO KROGER — save $3.10 vs Walmart."]],
+  ["Setup: your stores (once, 5 min)", ["Open <b>Setup</b> and pick up to 4 stores.", "For each: round-trip miles, drive minutes there and back, and minutes inside the store.",
+    "Use curbside? Turn on <b>Curbside pickup</b> and copy the fee, wait and markup from the store app's checkout.",
+    "Use delivery? Turn on <b>Delivery</b> and copy the fee, service %, tip, markup % and minimum order.", "Never use one? Leave it off and Ghost won't offer it."],
+    ["Kroger: 4 miles, 5 min drive, 3 min inside.", "Pickup on, $0 fee, 5 min wait. Delivery on, $3.99 + 5% + $5 tip, 20% markup."]],
+  ["Setup: your costs (once, 2 min)", ["Gas per mile (default $0.20) and your time per hour (default $15).",
+    "Minutes to order online (10) and sub risk ($3): what a bad substitution is worth to you.",
+    "Too close to call ($2): when two options are this close, Ghost picks the easier one."],
+    ["At $15 an hour, a 20-minute shop costs you $5.00 of time.", "That's why a far store can lose even with lower prices."]],
+  ["Loadout (shopping day, 30 sec)", ["Open <b>Loadout</b> and tap what you need today. Tapped items turn gold.",
+    "Use − / + to change the amount. It's in the item's unit: lb, gal, dozen.", "Something missing? Add it with the search box at the bottom."],
+    ["Milk, whole · 2 gal = two gallons.", "Tap Clear all ticks after you shop."]],
+  ["Every week: sales (10 min)", ["When the weekly ads come out (the Flipp app or the store apps), open <b>Log</b>.",
+    "Pick the store, find the item, type the sale price, tick <b>It's a sale price</b> and tap when the sale ends.",
+    "Ended sales stop counting on their own. No end date = 7 days."],
+    ["Walmart · Eggs, large · $2.50 · sale ends Saturday.", "Ghost uses $2.50 for Walmart eggs until then."]],
+  ["Every month: regular prices (20 min)", ["On each store's website, pick your local store and look up your staples.",
+    "Log each one. Receipts and shelf tags count too.", "Not the usual size? Open <b>Not the usual size?</b> and enter packs, size and unit.",
+    "Prices older than 90 days stop counting. Red rows need fixing."],
+    ["Kroger · Eggs, large · $4.80 · size 18 ct.", "Ghost turns that into $3.20 per dozen."]],
+  ["Reading Today", ["<b>The call</b>: where and how. GO TO, PICKUP AT, ORDER … DELIVERY, or two stores for a split.",
+    "<b>Savings</b>: how much less than the next best option. The colored chip and stripe are the rarity: Common, Uncommon $2+, Rare $5+, Legendary $10+, Exotic $20+.",
+    "<b>Tiles</b>: all-in total (groceries + trip or fees), intel (how many of today's items have real prices there), last scan (newest price).",
+    "<b>Why</b>: the biggest reasons in dollars. <b>Loot list</b>: what to buy where — tap to cross off. <b>All options</b>: every store and method ranked."], null],
+  ["Worked example", ["Today: eggs 1 dozen, milk 2 gal, chicken 3 lb, beef 2 lb, bananas 3 lb, coffee 1 lb.",
+    "Kroger in person: $42.10 + trip $2.80 = <b>$44.90</b>.", "Walmart in person: $44.30 (eggs on sale $2.50) + trip $3.70 = $48.00.",
+    "Aldi: $44.50 + $4.60 = $49.10 (no Aldi coffee price, so it uses your average, $9.50).",
+    "Kroger pickup: $42.10 + drive $2.05 + wait and order time $3.75 + sub risk $3.00 = $50.90.",
+    "Walmart delivery: $44.30 + fee $9.95 + tip $5.00 + order time $2.50 + sub risk $3.00 = $64.75."],
+    ["Winner: Kroger in person, $3.10 ahead of Walmart.", "Biggest wins: chicken −$1.50, coffee −$1.00, beef −$1.00."]],
+  ["How Ghost decides", ["Price = a live sale if there is one, otherwise the middle of your last 90 days of prices at that store.",
+    "No price at a store = your average from the others, so a gap never makes a store look cheaper.",
+    "A store needs real prices for half of today's list, or it sits out.", "In person, pickup and delivery each get an all-in total. Cheapest wins.",
+    "Within the too-close amount ($2): the easier option wins. A two-store split only if it beats the best by more than that, both trips counted."], null],
+  ["Phone, PC and backups", ["Your prices live on the device you use. Nothing is uploaded.",
+    "To move between phone and PC: <b>Setup → Save a backup file</b>, then on the other device <b>Restore from a file</b>.",
+    "On a phone, add it to your home screen so it opens like an app and keeps its data."], null],
+];
+function openHelp(start = 0) {
+  $("#overlay").innerHTML = `<div class="help" role="dialog" aria-modal="true" aria-label="Help"><div class="helpbox">
+    <div class="helphead"><span class="caps" id="helpCount">1 / ${HELP.length}</span><button class="btn ghost" id="helpClose">Close</button></div>
+    <div class="cards" id="cards" tabindex="0">${HELP.map(([t, steps, ex], i) => `<article class="hcard" aria-label="${esc(t)}"><h3>${esc(t)}</h3>
+      <${i === 0 || i === 6 || i === 8 || i === 9 ? "ul" : "ol"}>${steps.map((s) => `<li>${s}</li>`).join("")}</${i === 0 || i === 6 || i === 8 || i === 9 ? "ul" : "ol"}>
+      ${ex ? `<div class="ex"><b>EXAMPLE</b>${ex.map(esc).join("<br>")}</div>` : ""}</article>`).join("")}</div>
+    <div class="helpfoot"><button class="btn" id="helpPrev">◀ Back</button><div class="dots" id="dots">${HELP.map((_, i) => `<i class="${i === 0 ? "on" : ""}"></i>`).join("")}</div><button class="btn gold" id="helpNext">Next ▶</button></div>
+  </div></div>`;
+  const cards = $("#cards"), go = (i) => cards.scrollTo({ left: i * cards.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  const cur = () => Math.round(cards.scrollLeft / cards.clientWidth);
+  cards.addEventListener("scroll", () => { if (!$("#helpCount")) return; const i = cur(); $("#helpCount").textContent = `${i + 1} / ${HELP.length}`;
+    [...$("#dots").children].forEach((d, j) => d.classList.toggle("on", j === i)); $("#helpNext").textContent = i === HELP.length - 1 ? "Done" : "Next ▶"; });
+  $("#helpPrev").onclick = () => go(Math.max(0, cur() - 1));
+  $("#helpNext").onclick = () => (cur() === HELP.length - 1 ? closeHelp() : go(cur() + 1));
+  $("#helpClose").onclick = closeHelp;
+  if (start) requestAnimationFrame(() => go(start));
+  cards.focus();
+}
+function closeHelp() { $("#overlay").innerHTML = ""; if (state.ui.tab === "help") setTab("today"); }
+
+// ---------------- wiring ----------------
+function setTab(tab) {
+  state.ui.tab = tab; save();
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+  if (tab === "help") { openHelp(); return; }
+  ({ today: renderToday, loadout: renderLoadout, log: renderLog, setup: renderSetup })[tab]();
+  $("#dateLine").textContent = new Date(runDate() + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase();
+}
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2600); }
+function finder(input, list, onPick) {
+  const show = () => { const q = input.value.trim().toLowerCase(); const hits = itemNames().filter((n) => !q || n.toLowerCase().includes(q)).slice(0, 12);
+    list.innerHTML = hits.map((n) => `<li><button type="button" data-pick="${esc(n)}">${esc(n)} <span class="sub">· ${esc(unitOf(n))}</span></button></li>`).join("");
+    list.hidden = !hits.length || document.activeElement !== input && !list.contains(document.activeElement); };
+  input.addEventListener("input", show); input.addEventListener("focus", show);
+  list.addEventListener("click", (e) => { const b = e.target.closest("[data-pick]"); if (b) { onPick(b.dataset.pick); list.hidden = true; } });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { const first = list.querySelector("[data-pick]"); if (first && !itemNames().includes(input.value)) { e.preventDefault(); onPick(first.dataset.pick); list.hidden = true; } } });
+}
+function download(filename, text, mime) {
+  if (IN_ARTIFACT) {
+    claude.use("downloads").then((d) => (d ? d.save({ filename, data: new Blob([text], { type: mime }) }) : toast("Downloads aren't available here."))).catch(() => toast("Download cancelled."));
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = filename; document.body.append(a); a.click(); a.remove();
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  const tabBtn = t.closest("nav.tabs button"); if (tabBtn) return setTab(tabBtn.dataset.tab);
+  const goBtn = t.closest("[data-go]"); if (goBtn) return setTab(goBtn.dataset.go);
+  if (t.closest("#loadDemo, #loadDemo2")) { state = demoState(); save(); toast("Example data loaded"); return setTab("today"); }
+  const dq = t.closest("[data-dq]");
+  if (dq) { e.stopPropagation(); const r = state.loadout[+dq.dataset.i], u = unitOf(r.item), step = ["lb", "gal", "L"].includes(u) ? 0.5 : 1;
+    r.qty = Math.max(step, Math.round(((r.qty ?? 1) + step * +dq.dataset.dq) * 100) / 100); save(); return renderLoadout(); }
+  const item = t.closest(".item"); if (item) { const r = state.loadout[+item.dataset.i]; r.today = !r.today; save(); return renderLoadout(); }
+  if (t.closest("#clearToday")) { state.loadout.forEach((r) => (r.today = false)); save(); return renderLoadout(); }
+  const chip = t.closest("#storePick .chip"); if (chip) { document.querySelectorAll("#storePick .chip").forEach((c) => c.setAttribute("aria-pressed", String(c === chip))); return; }
+  const q = t.closest("#saleQuick .chip"); if (q) { $("#logSaleEnds").value = q.dataset.date; document.querySelectorAll("#saleQuick .chip").forEach((c) => c.setAttribute("aria-pressed", String(c === q))); return; }
+  const del = t.closest("[data-del]"); if (del) { state.log.splice(+del.dataset.del, 1); save(); toast("Price removed"); return renderLog(); }
+  if (t.closest("#backup")) return download(`grocery-director-backup-${todayISO()}.json`, JSON.stringify(state, null, 1), "application/json");
+  if (t.closest("#wipe")) { $("#wipeConfirm").innerHTML = `<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>Erase all stores, prices and settings on this device?</span><button class="btn danger" id="wipeYes">Erase</button><button class="btn ghost" id="wipeNo">Keep</button></div>`; return; }
+  if (t.closest("#wipeYes")) { state = freshState(); save(); toast("Erased"); return setTab("setup"); }
+  if (t.closest("#wipeNo")) { $("#wipeConfirm").innerHTML = ""; return; }
+  if (t.closest("#getPc")) {
+    fetch("grocery-director.html").then((r) => r.text()).then((html) => download("Grocery Director.html", html, "text/html")).catch(() => toast("Couldn't fetch the app file."));
+    return;
+  }
+  if (t.closest("#getPhone")) return openGetPhone();
+});
+document.addEventListener("keydown", (e) => {
+  const item = e.target.closest?.(".item"); if (item && (e.key === " " || e.key === "Enter") && !e.target.closest("button")) { e.preventDefault(); item.click(); }
+  if (e.key === "Escape" && $("#overlay").innerHTML) closeHelp();
+});
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.dataset.slot !== undefined) { state.settings.slots[+t.dataset.slot] = t.value; save(); return renderSetup(); }
+  if (t.dataset.set) { state.settings[t.dataset.set] = t.dataset.set === "region" ? t.value : (t.value === "" ? 0 : +t.value); save(); return; }
+  if (t.dataset.st && t.dataset.flag) { const st = (state.stores[t.dataset.st] ||= {}); st[t.dataset.flag] = t.checked; save(); return renderSetup(); }
+  if (t.dataset.st && t.dataset.k) { const st = (state.stores[t.dataset.st] ||= {}); st[t.dataset.k] = t.value === "" ? null : (t.dataset.pct !== undefined ? +t.value / 100 : +t.value); save(); return; }
+  if (t.id === "logSale") { $("#saleBox").hidden = !t.checked; return; }
+  if (t.id === "restore" && t.files[0]) { t.files[0].text().then((txt) => { const s = JSON.parse(txt); if (!s.settings || !Array.isArray(s.log)) throw 0; state = s; save(); toast("Backup restored"); setTab("today"); })
+    .catch(() => toast("That file isn't a Grocery Director backup.")); }
+});
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "logForm") return; e.preventDefault();
+  const store = $("#storePick .chip[aria-pressed=true]")?.dataset.store, item = $("#logItem").value.trim(), price = +$("#logPrice").value;
+  if (!store) return toast("Pick a store first");
+  if (!itemNames().includes(item)) return toast("Pick the item from the list");
+  if (!(price > 0)) return toast("Enter the price paid");
+  const num = (id) => ($(id).value === "" ? null : +$(id).value);
+  const sale = $("#logSale").checked;
+  state.log.push({ date: $("#logDate").value || runDate(), store, item, qty: num("#logQty"), size: num("#logSize"), unit: $("#logUnit").value || null,
+    price, type: sale ? "Sale" : "", saleEnds: sale ? ($("#logSaleEnds").value || null) : null });
+  state.ui.lastStore = store; save();
+  const v = GDEngine.decide(engineInput(), catalog()).vault.at(-1);
+  toast(v.unitPrice === "" ? "Saved, but the size doesn't fit this item - check it below" : `Saved: ${item} at ${store}, ${money(v.unitPrice)} / ${unitOf(item)}`);
+  renderLog(); $("#logItem").focus();
+});
+document.addEventListener("focusin", (e) => {
+  if (e.target.id === "logItem" && !e.target.dataset.wired) { e.target.dataset.wired = 1; finder(e.target, $("#logList"), (n) => { e.target.value = n;
+    const it = catalog().items.find((i) => i.name === n); $("#usualHint").textContent = it ? `(usual: ${it.usualSize} ${it.usualUnit})` : ""; $("#logPrice").focus(); }); e.target.dispatchEvent(new Event("focus")); }
+  if (e.target.id === "addItem" && !e.target.dataset.wired) { e.target.dataset.wired = 1; finder(e.target, $("#addList"), (n) => {
+    const ex = state.loadout.find((r) => r.item === n); if (ex) ex.today = true; else state.loadout.push({ item: n, qty: 1, today: true }); save(); renderLoadout(); toast(`${n} added`); }); e.target.dispatchEvent(new Event("focus")); }
+  if (e.target.id === "logSale" || e.target.id === "logSaleEnds") fillSaleQuick();
+});
+function fillSaleQuick() {
+  const box = $("#saleQuick"); if (!box || box.childElementCount) return;
+  const base = runDate(), dow = new Date(base + "T12:00:00Z").getUTCDay(), toSat = (6 - dow + 7) % 7 || 7;
+  box.innerHTML = [["This Saturday", toSat], ["In 3 days", 3], ["In a week", 7]].map(([l, n]) => `<button type="button" class="chip" aria-pressed="false" data-date="${addDays(base, n)}">${l}</button>`).join("");
+}
+function openGetPhone() {
+  const url = window.GD_PHONE_URL || "";
+  $("#overlay").innerHTML = `<div class="help" role="dialog" aria-modal="true" aria-label="Get it on a phone"><div class="helpbox getit"><div class="helphead"><span class="caps">Get it on a phone</span><button class="btn ghost" id="helpClose">Close</button></div>
+    <div class="hcard">${url ? `<p>On the phone, open this link:</p><p><b class="num" style="user-select:all;word-break:break-all">${esc(url)}</b></p><div class="qr" id="qr"></div>
+      <ol><li><b>iPhone (Safari):</b> tap Share, then <b>Add to Home Screen</b>.</li><li><b>Android (Chrome):</b> tap ⋮, then <b>Install app</b> or <b>Add to Home screen</b>.</li><li>Open it from the home-screen icon. Your prices stay on the phone.</li></ol>`
+      : `<p>The phone link isn't live yet. Until then, use <b>Download for PC</b>.</p>`}</div><div class="helpfoot"></div></div></div>`;
+  $("#helpClose").onclick = () => ($("#overlay").innerHTML = "");
+  if (url && window.QRCode) new QRCode($("#qr"), { text: url, width: 168, height: 168, colorDark: "#0d0f13", colorLight: "#ffffff" });
+}
+
+state = load();
+if (IN_ARTIFACT) $("#demo").hidden = false;
+setTab(state.ui.tab === "help" ? "today" : state.ui.tab || "today");
+if ("serviceWorker" in navigator && location.protocol === "https:" && !IN_ARTIFACT) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
