@@ -174,6 +174,13 @@ details.more summary { cursor: pointer; color: var(--gold); font-weight: 650 }
 .helpfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line) }
 .dots { display: flex; gap: 6px } .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line) } .dots i.on { background: var(--gold) }
 .getit .qr { background: #fff; padding: 10px; border-radius: 8px; width: max-content }
+.found { display: grid; gap: 8px }
+.found .chip { display: flex; justify-content: space-between; gap: 12px; border-radius: 10px; text-align: left; width: 100% }
+.found .chip .mi { color: inherit; opacity: .75; font-weight: 500; white-space: nowrap }
+.zipline { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end }
+.pcrow { display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line) }
+.pcrow input { text-align: right }
+.welcome h1 { font-family: var(--display); font-variation-settings: "wdth" 115; font-size: clamp(26px, 7vw, 40px); color: var(--gold); margin: 6px 0 0 }
 footer.foot { color: var(--dim); font-size: 11px; text-align: center; margin-top: 28px }
 </style>
 
@@ -500,8 +507,8 @@ const runDate = () => { try { return localStorage.getItem("grocery-director.runD
 
 function freshState() {
   return {
-    settings: { thr: 2, perMile: 0.2, perHour: 15, region: "US", window: 90, orderMin: 10, subHassle: 3, slots: ["", "", "", ""] },
-    stores: {}, log: [], customItems: [],
+    settings: { thr: 2, perMile: 0.2, perHour: 15, region: "US", window: 90, orderMin: 10, subHassle: 3, slots: ["", "", "", ""], zip: "" },
+    stores: {}, log: [], customItems: [], nearby: [],
     loadout: CATALOG.staples.map((s) => ({ item: s.item, qty: s.qty, today: false })),
     ui: { lastStore: "", tab: "today" },
   };
@@ -560,8 +567,9 @@ function renderToday() {
   const r = GDEngine.decide(engineInput(), catalog());
   const tierWord = (r.tier || "").split(" ")[0];
   const hero = $("#app");
+  if (state.settings.slots.every((s) => !s)) return renderWelcome();
   if (r.mode === "empty" || r.mode === "nodata") {
-    const noStores = state.settings.slots.every((s) => !s);
+    const noStores = false;
     hero.innerHTML = `<section class="screen"><div class="hero enter" data-testid="hero">
       <div class="planet"></div><div class="eyebrow"><span class="caps">Today's call</span></div>
       <div class="call" data-testid="call">${noStores ? "WELCOME, GUARDIAN" : esc(r.head)}</div>
@@ -570,7 +578,7 @@ function renderToday() {
       <div class="card empty-cta"><h2 class="sec">Next step</h2>
       ${noStores ? `<p>Start in <b>Setup</b>: pick the stores you shop and how far they are.</p><button class="btn gold" data-go="setup">Open Setup</button>`
         : r.mode === "empty" ? `<p>Pick what you need today on the <b>Loadout</b>.</p><button class="btn gold" data-go="loadout">Open Loadout</button>`
-        : `<p>Ghost needs real prices for at least half of today's list at a store. Log a few in <b>Log</b>.</p><button class="btn gold" data-go="log">Log a price</button>`}
+        : `<p>Ghost needs real prices for at least half of today's list at a store. A price check takes about 2 minutes per store: open the store's website or a receipt and type the prices in.</p><button class="btn gold" data-go="log">Do a price check</button>`}
       ${IN_ARTIFACT ? "" : `<button class="btn ghost" id="loadDemo">Look around with the example data</button>`}</div>
       <p class="tip">${tipHtml(r.tip)}</p></section>`;
     return;
@@ -624,11 +632,15 @@ function renderLoadout() {
 
 function renderLog() {
   const slots = state.settings.slots.filter(Boolean);
-  const others = CATALOG.stores.filter((s) => !slots.includes(s));
+  const others = knownStores().filter((s) => !slots.includes(s));
   const r = GDEngine.decide(engineInput(), catalog());
   const recent = state.log.map((row, i) => ({ row, i, v: r.vault[i] })).reverse().slice(0, 40);
   const ls = state.ui.lastStore || slots[0] || "";
-  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Log a price</h2><p class="sub">From a receipt, a shelf tag, the store's website, or this week's ad.</p></div>
+  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Price check</h2><p class="sub">The fast way: one store, all your staples. About 2 minutes with the store's website or a receipt open.</p></div>
+    <div class="card" style="display:grid;gap:12px"><div class="storepick" id="pcStores">${slots.map((s) =>
+      `<button type="button" class="chip" aria-pressed="${s === state.ui.pcStore}" data-pcstore="${esc(s)}">${esc(s)}</button>`).join("") || `<span class="sub">Pick your stores in Setup first.</span>`}</div>
+      <div id="priceCheck" style="display:grid;gap:12px"></div></div>
+    <div><h2 class="sec">Log one price</h2><p class="sub">For a sale from this week's ad, or a size that isn't the usual.</p></div>
     <form class="card" id="logForm" style="display:grid;gap:14px" autocomplete="off">
       <div class="f" style="display:grid;gap:6px"><span class="caps">Store</span><div class="storepick" id="storePick">${slots.concat(others).map((s) =>
         `<button type="button" class="chip" aria-pressed="${s === ls}" data-store="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>
@@ -651,6 +663,7 @@ function renderLog() {
       return `<div class="row ${cls}"><span><b>${esc(row.item)}</b> <span class="sub">· ${esc(row.store)} · ${esc(row.date)}${row.type === "Sale" ? " · sale" : ""}</span></span>
         <span class="num">${money(row.price || 0)}</span><button class="x" aria-label="Delete" data-del="${i}">×</button>
         <span class="sub" style="grid-column:1/-1">${esc(note)}</span></div>`; }).join("") || `<p class="sub">Nothing logged yet.</p>`}</div></section>`;
+  renderPriceCheck(state.ui.pcStore && slots.includes(state.ui.pcStore) ? state.ui.pcStore : "");
 }
 
 const STORE_FIELDS = [["miles", "Round-trip miles"], ["driveMin", "Drive min (round trip)"], ["shopMin", "Min inside"]];
@@ -658,16 +671,20 @@ const PICK_FIELDS = [["pickupFee", "Fee $"], ["pickupWait", "Wait min"], ["picku
 const DEL_FIELDS = [["deliveryFee", "Fee $"], ["serviceFee", "Service %", true], ["tip", "Tip $"], ["deliveryMarkup", "Markup %", true], ["minOrder", "Min order $"]];
 function renderSetup() {
   const s = state.settings;
-  const opt = (v) => `<option value="">—</option>` + CATALOG.stores.map((n) => `<option ${n === v ? "selected" : ""}>${esc(n)}</option>`).join("");
+  const opt = (v) => `<option value="">\u2014</option>` + knownStores().map((n) => `<option ${n === v ? "selected" : ""}>${esc(n)}</option>`).join("");
   const field = (st, [key, label, pct]) => `<label class="f">${esc(label)}<input type="number" inputmode="decimal" step="any" min="0" data-st="${esc(st)}" data-k="${key}" ${pct ? "data-pct" : ""}
      value="${state.stores[st]?.[key] === undefined || state.stores[st]?.[key] === null ? "" : pct ? +(state.stores[st][key] * 100).toFixed(4) : state.stores[st][key]}"></label>`;
-  const cards = s.slots.filter(Boolean).map((st) => { const v = state.stores[st] || {}; return `<div class="card storecard"><h3>${esc(st)}</h3>
+  const cards = s.slots.filter(Boolean).map((st) => { const v = state.stores[st] || {}; return `<div class="card storecard"><h3>${esc(st)}${v.mi ? ` <span class="sub" style="text-transform:none;letter-spacing:0">\u00b7 about ${v.mi} mi away</span>` : ""}</h3>
     <div class="grid3">${STORE_FIELDS.map((f) => field(st, f)).join("")}</div>
     <label class="toggle"><input type="checkbox" data-st="${esc(st)}" data-flag="pickup" ${v.pickup ? "checked" : ""}> Curbside pickup</label>
     ${v.pickup ? `<div class="grid3">${PICK_FIELDS.map((f) => field(st, f)).join("")}</div>` : ""}
     <label class="toggle"><input type="checkbox" data-st="${esc(st)}" data-flag="delivery" ${v.delivery ? "checked" : ""}> Delivery</label>
     ${v.delivery ? `<div class="grid3">${DEL_FIELDS.map((f) => field(st, f)).join("")}</div>` : ""}</div>`; }).join("");
-  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Your stores</h2><p class="sub">Pick up to 4 stores to compare.</p></div>
+  $("#app").innerHTML = `<section class="screen"><div><h2 class="sec">Where you shop</h2><p class="sub">Change your zip to find the stores near you. Prices you've logged stay with each store.</p></div>
+    <form class="card zipline" id="zipForm2"><label class="f" for="zip2">Zip code<input type="text" id="zip2" inputmode="numeric" maxlength="5" placeholder="72118" value="${esc(s.zip || "")}"></label>
+      <button class="btn" type="submit">Find stores</button></form>
+    <p class="sub" id="zipMsg2" style="margin:-6px 0 0">${s.place ? esc(s.place) + " \u00b7 " + (state.nearby || []).length + " stores found \u00b7 region " + esc(s.region) : "Only your zip code is used, to look up stores on OpenStreetMap."}</p>
+    <div><h2 class="sec">Your stores</h2><p class="sub">Pick up to 4 to compare. Picking one from your area fills in its distance.</p></div>
     <div class="card grid2">${[0, 1, 2, 3].map((k) => `<label class="f" for="slot${k}">Store ${k + 1}<select id="slot${k}" data-slot="${k}">${opt(s.slots[k])}</select></label>`).join("")}</div>
     ${cards || `<p class="sub">Pick a store above to set its distance and pickup or delivery.</p>`}
     <div><h2 class="sec">Your costs</h2><p class="sub">What your gas and time are worth, so a far store or a long shop is counted fairly.</p></div>
@@ -694,7 +711,8 @@ const HELP = [
     "It uses only your prices and plain math. No AI, no guessing. Same prices in, same answer out.",
     "Four screens: <b>Today</b> (the answer), <b>Loadout</b> (what you need), <b>Log</b> (prices), <b>Setup</b> (stores and costs)."],
     ["You need eggs, milk, chicken, beef, bananas and coffee.", "Today says GO TO KROGER — save $3.10 vs Walmart."]],
-  ["Setup: your stores (once, 5 min)", ["Open <b>Setup</b> and pick up to 4 stores.", "For each: round-trip miles, drive minutes there and back, and minutes inside the store.",
+  ["Setup: your stores (once, 1 min)", ["Type your <b>zip code</b> and tap <b>Find stores</b>. Ghost lists the grocery stores near you and how far each one is.",
+    "Tap up to 4 you shop at. Distance and drive time fill in on their own. Fine-tune them in <b>Setup</b> if you like.",
     "Use curbside? Turn on <b>Curbside pickup</b> and copy the fee, wait and markup from the store app's checkout.",
     "Use delivery? Turn on <b>Delivery</b> and copy the fee, service %, tip, markup % and minimum order.", "Never use one? Leave it off and Ghost won't offer it."],
     ["Kroger: 4 miles, 5 min drive, 3 min inside.", "Pickup on, $0 fee, 5 min wait. Delivery on, $3.99 + 5% + $5 tip, 20% markup."]],
@@ -709,8 +727,8 @@ const HELP = [
     "Pick the store, find the item, type the sale price, tick <b>It's a sale price</b> and tap when the sale ends.",
     "Ended sales stop counting on their own. No end date = 7 days."],
     ["Walmart · Eggs, large · $2.50 · sale ends Saturday.", "Ghost uses $2.50 for Walmart eggs until then."]],
-  ["Every month: regular prices (20 min)", ["On each store's website, pick your local store and look up your staples.",
-    "Log each one. Receipts and shelf tags count too.", "Not the usual size? Open <b>Not the usual size?</b> and enter packs, size and unit.",
+  ["Price check (2 min a store)", ["Open <b>Log</b>, tap a store under <b>Price check</b>, and type what each staple costs there.",
+    "Use the store's website (pick your local store) or a receipt. Leave blanks for anything you don't know.", "Not the usual size? Open <b>Not the usual size?</b> and enter packs, size and unit.",
     "Prices older than 90 days stop counting. Red rows need fixing."],
     ["Kroger · Eggs, large · $4.80 · size 18 ct.", "Ghost turns that into $3.20 per dozen."]],
   ["Reading Today", ["<b>The call</b>: where and how. GO TO, PICKUP AT, ORDER … DELIVERY, or two stores for a split.",
@@ -751,8 +769,101 @@ function openHelp(start = 0) {
 }
 function closeHelp() { $("#overlay").innerHTML = ""; if (state.ui.tab === "help") setTab("today"); }
 
+
+// ---------------- nearby stores (OpenStreetMap; only the zip and its map point leave the device) ----------------
+const REGION_OF = (st) => ({ CT: "Northeast", ME: "Northeast", MA: "Northeast", NH: "Northeast", RI: "Northeast", VT: "Northeast", NJ: "Northeast", NY: "Northeast", PA: "Northeast",
+  IL: "Midwest", IN: "Midwest", MI: "Midwest", OH: "Midwest", WI: "Midwest", IA: "Midwest", KS: "Midwest", MN: "Midwest", MO: "Midwest", NE: "Midwest", ND: "Midwest", SD: "Midwest",
+  AZ: "West", CO: "West", ID: "West", MT: "West", NV: "West", NM: "West", UT: "West", WY: "West", AK: "West", CA: "West", HI: "West", OR: "West", WA: "West" }[st] || "South");
+const CHAIN = [[/walmart/i, "Walmart"], [/kroger/i, "Kroger"], [/aldi/i, "Aldi"], [/sam'?s club/i, "Sam's Club"], [/costco/i, "Costco"], [/^target/i, "Target"],
+  [/whole foods/i, "Whole Foods"], [/trader joe/i, "Trader Joe's"], [/edward'?s food giant/i, "Edwards Food Giant"], [/harps/i, "Harps"], [/publix/i, "Publix"],
+  [/h-?e-?b\b/i, "H-E-B"], [/food lion/i, "Food Lion"], [/safeway/i, "Safeway"], [/meijer/i, "Meijer"], [/winco/i, "WinCo"], [/hy-?vee/i, "Hy-Vee"], [/lidl/i, "Lidl"],
+  [/piggly wiggly/i, "Piggly Wiggly"], [/save.?a.?lot/i, "Save A Lot"], [/sprouts/i, "Sprouts"], [/fresh market/i, "The Fresh Market"]];
+const chainOf = (name) => { for (const [re, c] of CHAIN) if (re.test(name)) return c; return name.trim(); };
+const milesBetween = (a, b, c, d) => { const R = 3958.8, rad = (x) => x * Math.PI / 180;
+  return 2 * R * Math.asin(Math.sqrt(Math.sin(rad(c - a) / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(rad(d - b) / 2) ** 2)); };
+async function findStores(zip) {
+  const z = await (await fetch(`https://api.zippopotam.us/us/${encodeURIComponent(zip)}`)).json();
+  const pl = z.places && z.places[0]; if (!pl) throw new Error("zip");
+  const lat = +pl.latitude, lon = +pl.longitude;
+  const q = `[out:json][timeout:25];(nwr["shop"~"^(supermarket|wholesale|grocery|department_store)$"](around:16000,${lat},${lon}););out center tags;`;
+  let data = null;
+  for (const host of ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter"]) {
+    try { const r = await fetch(host, { method: "POST", body: new URLSearchParams({ data: q }) }); if (r.ok) { data = await r.json(); break; } } catch {}
+  }
+  if (!data) throw new Error("map");
+  const best = {};
+  for (const e of data.elements) {
+    const t = e.tags || {}, raw = t.brand || t.name; if (!raw) continue;
+    if (t.shop === "department_store" && !/walmart|target/i.test(raw)) continue;
+    const name = chainOf(raw), mi = milesBetween(lat, lon, e.lat ?? e.center?.lat, e.lon ?? e.center?.lon);
+    if (!(mi >= 0)) continue;
+    if (!best[name] || mi < best[name]) best[name] = mi;
+  }
+  const list = Object.entries(best).map(([name, mi]) => ({ name, mi: Math.round(mi * 10) / 10 })).sort((a, b) => a.mi - b.mi || a.name.localeCompare(b.name)).slice(0, 14);
+  return { place: `${pl["place name"]}, ${pl["state abbreviation"]}`, region: REGION_OF(pl["state abbreviation"]), list };
+}
+// one-way straight-line miles -> round-trip road miles and minutes (roads run ~25% longer; ~28 mph around town)
+const tripFrom = (mi) => { const rt = Math.round(mi * 2 * 1.25 * 10) / 10; return { miles: rt, driveMin: Math.round(rt / 28 * 60), shopMin: 20 }; };
+const PICK_DEFAULTS = { pickupFee: 0, pickupWait: 5, pickupMarkup: 0 };
+const DEL_DEFAULTS = { deliveryFee: 6.99, serviceFee: 0.05, tip: 5, deliveryMarkup: 0.1, minOrder: 35 };
+function knownStores() {
+  return [...new Set([...state.settings.slots.filter(Boolean), ...(state.nearby || []).map((n) => n.name), ...CATALOG.stores])];
+}
+
+function renderWelcome(msg = "") {
+  const found = state.nearby || [];
+  const picked = new Set(state.ui.picked || []);
+  $("#app").innerHTML = `<section class="screen welcome"><div class="hero" data-testid="hero"><div class="planet"></div>
+      <div class="eyebrow"><span class="caps">First run · about a minute</span></div>
+      <div class="call" data-testid="call">WELCOME, GUARDIAN</div><div class="save" data-testid="save">Let's find your stores</div>
+      <div class="quote" data-testid="ghost">Every run starts in orbit.</div></div>
+    <div class="card" style="display:grid;gap:12px"><h2 class="sec">1 · Your zip code</h2>
+      <form class="zipline" id="zipForm"><label class="f" for="zip">Zip code<input type="text" id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="72118" value="${esc(state.settings.zip || "")}"></label>
+        <button class="btn gold" id="zipGo" type="submit">Find stores</button></form>
+      <p class="sub" id="zipMsg">${msg ? esc(msg) : state.settings.place ? esc(state.settings.place) : "Only your zip code is used, to look up stores on OpenStreetMap."}</p></div>
+    ${found.length ? `<div class="card" style="display:grid;gap:12px"><h2 class="sec">2 · Tap the stores you shop at (up to 4)</h2>
+      <div class="found" id="found">${found.map((n) => `<button type="button" class="chip" aria-pressed="${picked.has(n.name)}" data-near="${esc(n.name)}"><span>${esc(n.name)}</span><span class="mi num">about ${n.mi} mi</span></button>`).join("")}</div>
+      <button class="btn gold" id="useStores" ${picked.size ? "" : "disabled"}>Use ${picked.size || "these"} store${picked.size === 1 ? "" : "s"}</button></div>` : ""}
+    <div class="card" style="display:grid;gap:8px"><h2 class="sec">Then</h2><p style="margin:0">A 2-minute price check at your main store, and Ghost gives you a call. Pickup and delivery can be turned on in Setup.</p>
+      ${IN_ARTIFACT ? `<p class="sub" style="margin:0">Store lookup works in your own copy. In this demo, use <b>Load the example data</b>.</p>` : ""}
+      <button class="btn ghost" id="loadDemo">Look around with the example data</button></div></section>`;
+}
+async function runFinder(zip, then) {
+  if (!/^\d{5}$/.test(zip)) { toast("Enter a 5-digit zip code"); return; }
+  const msg = $("#zipMsg"); if (msg) msg.textContent = "Looking up stores near " + zip + "…";
+  try {
+    const res = await findStores(zip);
+    state.settings.zip = zip; state.settings.place = res.place; state.settings.region = res.region; state.nearby = res.list; state.ui.picked = [];
+    save(); then(res.list.length ? "" : "No grocery stores found within 10 miles of " + zip + ".");
+  } catch (e) {
+    then(e.message === "zip" ? "That zip code wasn't found." : "Couldn't reach the store map right now. Check your connection, or pick stores in Setup.");
+  }
+}
+function applyStores(names) {
+  names.slice(0, 4).forEach((n) => {
+    const near = (state.nearby || []).find((x) => x.name === n);
+    const st = (state.stores[n] ||= {});
+    if (near) Object.assign(st, tripFrom(near.mi), { mi: near.mi });
+  });
+  state.settings.slots = [0, 1, 2, 3].map((k) => names[k] || "");
+}
+
+function renderPriceCheck(store) {
+  const box = $("#priceCheck"); if (!box) return;
+  const items = state.loadout.map((r) => r.item);
+  const r = GDEngine.decide(engineInput(), catalog());
+  const lastAt = (item) => { const rows = state.log.map((row, i) => ({ row, v: r.vault[i] })).filter((x) => x.row.store === store && x.row.item === item && x.v.unitPrice !== "");
+    return rows.length ? rows[rows.length - 1].v.unitPrice : null; };
+  box.innerHTML = store ? `<p class="sub" style="margin:0">Type what each costs at <b>${esc(store)}</b> in its usual size. Leave blanks for anything you don't know.</p>
+    <div>${items.map((it, i) => { const c = catalog().items.find((x) => x.name === it) || {}; const last = lastAt(it);
+      return `<label class="pcrow" for="pc${i}"><span><b>${esc(it)}</b><br><span class="sub">${esc(c.usualSize ?? "")} ${esc(c.usualUnit ?? "")}${last !== null ? " · last " + money(last) + "/" + esc(c.priceUnit) : ""}</span></span>
+        <input type="number" id="pc${i}" data-pc="${esc(it)}" inputmode="decimal" step="0.01" min="0" placeholder="$"></label>`; }).join("")}</div>
+    <button class="btn gold" id="pcSave">Save prices</button>` : `<p class="sub" style="margin:0">Pick a store above.</p>`;
+}
+
 // ---------------- wiring ----------------
 function setTab(tab) {
+  if (state.ui.tab !== tab) window.scrollTo(0, 0);
   state.ui.tab = tab; save();
   document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
   if (tab === "help") { openHelp(); return; }
@@ -780,6 +891,20 @@ document.addEventListener("click", (e) => {
   const t = e.target;
   const tabBtn = t.closest("nav.tabs button"); if (tabBtn) return setTab(tabBtn.dataset.tab);
   const goBtn = t.closest("[data-go]"); if (goBtn) return setTab(goBtn.dataset.go);
+  const nb = t.closest("[data-near]");
+  if (nb) { const set = new Set(state.ui.picked || []); const n = nb.dataset.near;
+    if (set.has(n)) set.delete(n); else if (set.size < 4) set.add(n); else toast("Pick up to 4 stores");
+    state.ui.picked = [...set]; save(); return renderWelcome(); }
+  if (t.closest("#useStores")) { const order = (state.nearby || []).map((n) => n.name).filter((n) => (state.ui.picked || []).includes(n));
+    applyStores(order); state.ui.pcStore = order[0]; save(); toast("Stores set. Now a quick price check."); return setTab("log"); }
+  const pcs = t.closest("[data-pcstore]");
+  if (pcs) { state.ui.pcStore = pcs.dataset.pcstore; save(); document.querySelectorAll("#pcStores .chip").forEach((c) => c.setAttribute("aria-pressed", String(c === pcs))); return renderPriceCheck(state.ui.pcStore); }
+  if (t.closest("#pcSave")) {
+    const rows = [...document.querySelectorAll("[data-pc]")].filter((i) => i.value !== "" && +i.value > 0);
+    if (!rows.length) return toast("Type at least one price");
+    rows.forEach((i) => state.log.push({ date: runDate(), store: state.ui.pcStore, item: i.dataset.pc, qty: null, size: null, unit: null, price: +i.value, type: "", saleEnds: null }));
+    save(); toast(`Saved ${rows.length} price${rows.length === 1 ? "" : "s"} at ${state.ui.pcStore}`); return renderLog();
+  }
   if (t.closest("#loadDemo, #loadDemo2")) { state = demoState(); save(); toast("Example data loaded"); return setTab("today"); }
   const dq = t.closest("[data-dq]");
   if (dq) { e.stopPropagation(); const r = state.loadout[+dq.dataset.i], u = unitOf(r.item), step = ["lb", "gal", "L"].includes(u) ? 0.5 : 1;
@@ -805,15 +930,22 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("change", (e) => {
   const t = e.target;
-  if (t.dataset.slot !== undefined) { state.settings.slots[+t.dataset.slot] = t.value; save(); return renderSetup(); }
+  if (t.dataset.slot !== undefined) { const n = t.value; state.settings.slots[+t.dataset.slot] = n;
+    const near = (state.nearby || []).find((x) => x.name === n), st = n ? (state.stores[n] ||= {}) : null;
+    if (near && st && st.miles === undefined) Object.assign(st, tripFrom(near.mi), { mi: near.mi });
+    save(); return renderSetup(); }
   if (t.dataset.set) { state.settings[t.dataset.set] = t.dataset.set === "region" ? t.value : (t.value === "" ? 0 : +t.value); save(); return; }
-  if (t.dataset.st && t.dataset.flag) { const st = (state.stores[t.dataset.st] ||= {}); st[t.dataset.flag] = t.checked; save(); return renderSetup(); }
+  if (t.dataset.st && t.dataset.flag) { const st = (state.stores[t.dataset.st] ||= {}); st[t.dataset.flag] = t.checked;
+    if (t.checked) for (const [k, v] of Object.entries(t.dataset.flag === "pickup" ? PICK_DEFAULTS : DEL_DEFAULTS)) if (st[k] === undefined || st[k] === null) st[k] = v;
+    save(); return renderSetup(); }
   if (t.dataset.st && t.dataset.k) { const st = (state.stores[t.dataset.st] ||= {}); st[t.dataset.k] = t.value === "" ? null : (t.dataset.pct !== undefined ? +t.value / 100 : +t.value); save(); return; }
   if (t.id === "logSale") { $("#saleBox").hidden = !t.checked; return; }
   if (t.id === "restore" && t.files[0]) { t.files[0].text().then((txt) => { const s = JSON.parse(txt); if (!s.settings || !Array.isArray(s.log)) throw 0; state = s; save(); toast("Backup restored"); setTab("today"); })
     .catch(() => toast("That file isn't a Grocery Director backup.")); }
 });
 document.addEventListener("submit", (e) => {
+  if (e.target.id === "zipForm") { e.preventDefault(); return runFinder($("#zip").value.trim(), (m) => renderWelcome(m)); }
+  if (e.target.id === "zipForm2") { e.preventDefault(); return runFinder($("#zip2").value.trim(), (m) => { renderSetup(); if (m) $("#zipMsg2").textContent = m; }); }
   if (e.target.id !== "logForm") return; e.preventDefault();
   const store = $("#storePick .chip[aria-pressed=true]")?.dataset.store, item = $("#logItem").value.trim(), price = +$("#logPrice").value;
   if (!store) return toast("Pick a store first");
